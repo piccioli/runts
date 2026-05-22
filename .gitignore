@@ -1,4 +1,6 @@
 runts.db
+runts.db-shm
+runts.db-wal
 __pycache__/
 *.pyc
 .venv/

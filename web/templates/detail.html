@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ ente.denominazione }} — RUNTS CAI{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{{ back }}" class="btn btn-sm btn-outline-secondary">← Torna alla lista</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header bg-dark text-white">
+    <h1 class="h5 mb-0">{{ ente.denominazione }}</h1>
+  </div>
+  <div class="card-body">
+    <dl class="row mb-0">
+
+      {% set labels = {
+        "codice_fiscale": "Codice fiscale",
+        "forma_giuridica": "Forma giuridica",
+        "natura_giuridica": "Natura giuridica",
+        "sezione_registro": "Sezione del registro",
+        "data_iscrizione": "Data iscrizione",
+        "sede_indirizzo": "Indirizzo",
+        "sede_comune": "Comune",
+        "sede_provincia": "Provincia",
+        "sede_regione": "Regione",
+        "sede_cap": "CAP",
+        "rappresentante_legale": "Rappresentante legale",
+        "pec": "PEC",
+        "sito_web": "Sito web",
+        "settori_attivita": "Settori di attività"
+      } %}
+
+      {% for key, label in labels.items() %}
+        {% if fields.get(key) %}
+        <dt class="col-sm-4 col-md-3 text-muted small">{{ label }}</dt>
+        <dd class="col-sm-8 col-md-9">
+          {% if key == "pec" %}
+            <a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
+          {% elif key == "sito_web" %}
+            <a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
+          {% else %}
+            {{ fields[key] }}
+          {% endif %}
+        </dd>
+        {% endif %}
+      {% endfor %}
+
+    </dl>
+  </div>
+  {% if ente.url_dettaglio %}
+  <div class="card-footer text-end">
+    <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+      Vedi su RUNTS ↗
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Lista Enti — RUNTS CAI{% endblock %}
+
+{% block content %}
+<h1 class="h4 mb-3">Enti iscritti al RUNTS</h1>
+
+{# Search / filter form #}
+<form method="get" action="/" class="row g-2 mb-4">
+  <div class="col-12 col-md-4">
+    <input type="text" name="q" class="form-control" placeholder="Cerca per denominazione…" value="{{ q }}">
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="regione" class="form-select">
+      <option value="">Tutte le regioni</option>
+      {% for r in regioni %}
+        <option value="{{ r }}" {% if r == regione %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <select name="sezione_registro" class="form-select">
+      <option value="">Tutte le sezioni</option>
+      {% for s in sezioni %}
+        <option value="{{ s }}" {% if s == sezione_registro %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-md-2 d-flex gap-2">
+    <button type="submit" class="btn btn-primary flex-fill">Cerca</button>
+    <a href="/" class="btn btn-outline-secondary">Reset</a>
+  </div>
+</form>
+
+{# Result count #}
+{% if total == 0 %}
+  <div class="alert alert-info">Nessun ente trovato.</div>
+{% else %}
+  <p class="text-muted small mb-2">
+    {{ total }} enti trovati — pagina {{ page }} di {{ total_pages }}
+  </p>
+
+  {# Table #}
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Denominazione</th>
+          <th>Comune</th>
+          <th>Regione</th>
+          <th>Sezione</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in enti %}
+        {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&sezione_registro=" ~ sezione_registro ~ "&page=" ~ page %}
+        <tr>
+          <td>
+            <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
+              {{ e.denominazione }}
+            </a>
+          </td>
+          <td>{{ e.sede_comune or "—" }}</td>
+          <td>{{ e.sede_regione or "—" }}</td>
+          <td>{{ e.sezione_registro or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Pagination #}
+  {% if total_pages > 1 %}
+  <nav>
+    <ul class="pagination pagination-sm">
+      <li class="page-item {% if page == 1 %}disabled{% endif %}">
+        <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page - 1 }}">‹</a>
+      </li>
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == page or (p >= page - 2 and p <= page + 2) or p == 1 or p == total_pages %}
+          <li class="page-item {% if p == page %}active{% endif %}">
+            <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ p }}">{{ p }}</a>
+          </li>
+        {% elif p == page - 3 or p == page + 3 %}
+          <li class="page-item disabled"><span class="page-link">…</span></li>
+        {% endif %}
+      {% endfor %}
+      <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+        <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page + 1 }}">›</a>
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+{% endif %}
+{% endblock %}

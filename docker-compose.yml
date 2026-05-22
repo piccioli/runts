@@ -1,0 +1,10 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./runts.db:/app/runts.db:ro
+    environment:
+      - DB_PATH=/app/runts.db
+    restart: unless-stopped
