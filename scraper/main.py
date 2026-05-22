@@ -3,8 +3,8 @@ import asyncio
 import logging
 import sys
 
-from db import get_stats, init_db, upsert_ente
-from scraper import run_scraper
+from .db import get_stats, init_db, upsert_ente
+from .scraper import run_scraper
 
 logging.basicConfig(
     level=logging.INFO,
