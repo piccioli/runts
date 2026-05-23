@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS enti (
     sede_provincia    TEXT,
     sede_regione      TEXT,
     sede_cap          TEXT,
+    lat               REAL,
+    lon               REAL,
     data_iscrizione   TEXT,
     sezione_registro  TEXT,
     settori_attivita  TEXT,
@@ -33,6 +35,8 @@ CREATE TABLE IF NOT EXISTS enti (
 _MIGRATIONS = [
     "ALTER TABLE enti ADD COLUMN sede_stato TEXT",
     "ALTER TABLE enti ADD COLUMN sede_civico TEXT",
+    "ALTER TABLE enti ADD COLUMN lat REAL",
+    "ALTER TABLE enti ADD COLUMN lon REAL",
 ]
 
 
@@ -71,7 +75,7 @@ def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
         "id_runts", "codice_fiscale", "denominazione", "forma_giuridica",
         "natura_giuridica", "sede_stato", "sede_indirizzo", "sede_civico",
         "sede_comune", "sede_provincia", "sede_regione", "sede_cap",
-        "data_iscrizione", "sezione_registro", "settori_attivita",
+        "lat", "lon", "data_iscrizione", "sezione_registro", "settori_attivita",
         "rappresentante_legale", "sito_web", "pec",
         "url_dettaglio", "raw_json", "updated_at",
     ]

@@ -1,6 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Lista Enti — RUNTS CAI{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+{% endblock %}
+
 {% block content %}
 <h1 class="h4 mb-3">Enti iscritti al RUNTS</h1>
 
@@ -31,64 +35,135 @@
   </div>
 </form>
 
-{# Result count #}
+{# Result count + toggle #}
 {% if total == 0 %}
   <div class="alert alert-info">Nessun ente trovato.</div>
 {% else %}
-  <p class="text-muted small mb-2">
-    {{ total }} enti trovati — pagina {{ page }} di {{ total_pages }}
-  </p>
-
-  {# Table #}
-  <div class="table-responsive">
-    <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
-      <thead class="table-light">
-        <tr>
-          <th>Denominazione</th>
-          <th>Comune</th>
-          <th>Regione</th>
-          <th>Sezione</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for e in enti %}
-        {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&sezione_registro=" ~ sezione_registro ~ "&page=" ~ page %}
-        <tr>
-          <td>
-            <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
-              {{ e.denominazione }}
-            </a>
-          </td>
-          <td>{{ e.sede_comune or "—" }}</td>
-          <td>{{ e.sede_regione or "—" }}</td>
-          <td>{{ e.sezione_registro or "—" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <p class="text-muted small mb-0">
+      {{ total }} enti trovati — pagina {{ page }} di {{ total_pages }}
+    </p>
+    <div class="btn-group btn-group-sm" role="group">
+      <button id="btn-lista" type="button" class="btn btn-primary" onclick="showLista()">Lista</button>
+      <button id="btn-mappa" type="button" class="btn btn-outline-primary" onclick="showMappa()">Mappa</button>
+    </div>
   </div>
 
-  {# Pagination #}
-  {% if total_pages > 1 %}
-  <nav>
-    <ul class="pagination pagination-sm">
-      <li class="page-item {% if page == 1 %}disabled{% endif %}">
-        <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page - 1 }}">‹</a>
-      </li>
-      {% for p in range(1, total_pages + 1) %}
-        {% if p == page or (p >= page - 2 and p <= page + 2) or p == 1 or p == total_pages %}
-          <li class="page-item {% if p == page %}active{% endif %}">
-            <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ p }}">{{ p }}</a>
-          </li>
-        {% elif p == page - 3 or p == page + 3 %}
-          <li class="page-item disabled"><span class="page-link">…</span></li>
-        {% endif %}
+  {# Table view #}
+  <div id="view-lista">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
+        <thead class="table-light">
+          <tr>
+            <th>Denominazione</th>
+            <th>Comune</th>
+            <th>Regione</th>
+            <th>Sezione</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in enti %}
+          {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&sezione_registro=" ~ sezione_registro ~ "&page=" ~ page %}
+          <tr>
+            <td>
+              <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
+                {{ e.denominazione }}
+              </a>
+            </td>
+            <td>{{ e.sede_comune or "—" }}</td>
+            <td>{{ e.sede_regione or "—" }}</td>
+            <td>{{ e.sezione_registro or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Pagination #}
+    {% if total_pages > 1 %}
+    <nav>
+      <ul class="pagination pagination-sm">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page - 1 }}">‹</a>
+        </li>
+        {% for p in range(1, total_pages + 1) %}
+          {% if p == page or (p >= page - 2 and p <= page + 2) or p == 1 or p == total_pages %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+              <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ p }}">{{ p }}</a>
+            </li>
+          {% elif p == page - 3 or p == page + 3 %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {% if page == total_pages %}disabled{% endif %}">
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page + 1 }}">›</a>
+        </li>
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+
+  {# Map view #}
+  <div id="view-mappa" style="display:none;">
+    <div id="map" style="height:520px; border-radius:0.5rem; overflow:hidden;"></div>
+  </div>
+
+  {# Geo data for Leaflet #}
+  <script>
+    var ENTI_GEO = {{ enti | map(attribute='__iter__') | list | tojson if false else '[]' }};
+    ENTI_GEO = [
+      {% for e in enti %}
+      {% if e.lat and e.lon %}
+      {"id": {{ e.id_runts | tojson }}, "nome": {{ e.denominazione | tojson }}, "lat": {{ e.lat }}, "lon": {{ e.lon }}},
+      {% endif %}
       {% endfor %}
-      <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-        <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page + 1 }}">›</a>
-      </li>
-    </ul>
-  </nav>
-  {% endif %}
+    ];
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    var map = null;
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map');
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 18
+      }).addTo(map);
+
+      if (ENTI_GEO.length === 0) {
+        map.setView([42.5, 12.5], 6);
+        L.popup().setLatLng([42.5, 12.5])
+          .setContent("Nessun ente con coordinate disponibili")
+          .openOn(map);
+        return;
+      }
+
+      var bounds = [];
+      ENTI_GEO.forEach(function(e) {
+        var marker = L.marker([e.lat, e.lon]).addTo(map);
+        marker.bindPopup('<strong>' + e.nome + '</strong><br><a href="/ente/' + encodeURIComponent(e.id) + '">Vedi dettaglio</a>');
+        bounds.push([e.lat, e.lon]);
+      });
+      map.fitBounds(bounds, {padding: [30, 30]});
+    }
+
+    function showLista() {
+      document.getElementById('view-lista').style.display = '';
+      document.getElementById('view-mappa').style.display = 'none';
+      document.getElementById('btn-lista').className = 'btn btn-primary';
+      document.getElementById('btn-mappa').className = 'btn btn-outline-primary';
+    }
+
+    function showMappa() {
+      document.getElementById('view-lista').style.display = 'none';
+      document.getElementById('view-mappa').style.display = '';
+      document.getElementById('btn-lista').className = 'btn btn-outline-primary';
+      document.getElementById('btn-mappa').className = 'btn btn-primary';
+      initMap();
+      if (map) { map.invalidateSize(); }
+    }
+  </script>
 {% endif %}
 {% endblock %}

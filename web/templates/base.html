@@ -9,7 +9,9 @@
     body { background: #f8f9fa; }
     .navbar-brand { font-weight: 700; letter-spacing: .5px; }
     .table th { white-space: nowrap; }
+    .leaflet-container img { max-width: none !important; max-height: none !important; }
   </style>
+  {% block head %}{% endblock %}
 </head>
 <body>
   <nav class="navbar navbar-dark bg-dark mb-4">

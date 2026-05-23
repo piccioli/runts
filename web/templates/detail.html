@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ ente.denominazione }} — RUNTS CAI{% endblock %}
 
+{% block head %}
+{% if lat and lon %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+{% endif %}
+{% endblock %}
+
 {% block content %}
 <div class="mb-3">
   <a href="{{ back }}" class="btn btn-sm btn-outline-secondary">← Torna alla lista</a>
@@ -57,4 +63,22 @@
   </div>
   {% endif %}
 </div>
+
+{% if lat and lon %}
+<div class="card shadow-sm mt-4">
+  <div class="card-header bg-secondary text-white small fw-semibold">Sede legale — mappa</div>
+  <div id="map" style="height:380px;"></div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var map = L.map('map').setView([{{ lat }}, {{ lon }}], 14);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18
+  }).addTo(map);
+  L.marker([{{ lat }}, {{ lon }}]).addTo(map)
+    .bindPopup({{ ente.denominazione | tojson }})
+    .openPopup();
+</script>
+{% endif %}
 {% endblock %}

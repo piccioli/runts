@@ -68,7 +68,7 @@ async def enti_list(
         offset = (page - 1) * PAGE_SIZE
 
         enti = conn.execute(
-            f"SELECT id_runts, denominazione, sede_comune, sede_regione, sezione_registro "
+            f"SELECT id_runts, denominazione, sede_comune, sede_regione, sezione_registro, lat, lon "
             f"FROM enti {where_sql} ORDER BY denominazione LIMIT ? OFFSET ?",
             params + [PAGE_SIZE, offset],
         ).fetchall()
@@ -114,4 +114,10 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
         return _tr(request, "404.html", status_code=404)
 
     fields = {k: row[k] for k in row.keys() if row[k] is not None and k not in ("id_runts", "raw_json", "updated_at")}
-    return _tr(request, "detail.html", {"ente": row, "fields": fields, "back": back or "/"})
+    return _tr(request, "detail.html", {
+        "ente": row,
+        "fields": fields,
+        "back": back or "/",
+        "lat": row["lat"] if "lat" in row.keys() else None,
+        "lon": row["lon"] if "lon" in row.keys() else None,
+    })
