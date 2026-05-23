@@ -4,30 +4,26 @@
 Definire come il sistema persiste i dati degli enti nel database SQLite, garantendo inizializzazione automatica, aggiornamenti idempotenti e tracciamento delle modifiche nel tempo.
 ## Requirements
 ### Requirement: Inizializzazione del database SQLite
-Il sistema SHALL creare automaticamente il file di database SQLite e le tabelle necessarie se non esistono. Lo schema SHALL includere le colonne `sede_stato` e `sede_civico`. Su database esistenti, il sistema SHALL aggiungere le colonne mancanti senza perdere i dati esistenti.
+Il sistema SHALL creare automaticamente il file di database SQLite e le tabelle necessarie se non esistono. Lo schema SHALL includere le colonne `lat` e `lon` (REAL) per le coordinate geografiche e la tabella `geocoding_cache`. Su database esistenti, il sistema SHALL aggiungere le colonne e tabelle mancanti senza perdere i dati esistenti.
 
 #### Scenario: Prima esecuzione
 - **WHEN** il database non esiste
-- **THEN** il sistema crea `runts.db` e la tabella `enti` con le colonne `sede_stato` e `sede_civico` incluse
+- **THEN** il sistema crea `runts.db` con la tabella `enti` (incluse `lat`, `lon`), la tabella `geocoding_cache` e gli indici su `sede_regione` e `sezione_registro`
 
 #### Scenario: Migrazione database esistente
-- **WHEN** il database esiste ma le colonne `sede_stato` e/o `sede_civico` sono assenti
-- **THEN** il sistema aggiunge le colonne mancanti senza errori e senza perdita di dati
-
-#### Scenario: Esecuzioni successive (schema aggiornato)
-- **WHEN** il database esiste già con schema aggiornato
-- **THEN** il sistema usa il database esistente senza modifiche allo schema
+- **WHEN** il database esiste ma mancano tabella `geocoding_cache` o gli indici
+- **THEN** il sistema aggiunge gli elementi mancanti senza errori e senza perdita di dati
 
 ### Requirement: Persistenza con upsert degli enti
-Il sistema SHALL inserire nuovi record o aggiornare quelli esistenti usando il codice fiscale come chiave univoca, in modo che esecuzioni successive aggiornino i dati senza creare duplicati.
+Il sistema SHALL inserire nuovi record o aggiornare quelli esistenti usando il codice fiscale come chiave univoca, preservando i valori esistenti di `lat` e `lon` quando non presenti o nulli nel dict in input.
 
-#### Scenario: Inserimento di un nuovo ente
-- **WHEN** un ente estratto non è presente nel database (codice fiscale non trovato)
+#### Scenario: Rerun scraper su ente già geocodificato
+- **WHEN** lo scraper rilancia su un ente già geocodificato (dict senza `lat`/`lon` o con valori `None`)
+- **THEN** i valori di `lat` e `lon` nel DB restano invariati
+
+#### Scenario: Primo inserimento
+- **WHEN** un ente estratto non è presente nel database
 - **THEN** il sistema inserisce un nuovo record con tutti i campi estratti e il timestamp di aggiornamento
-
-#### Scenario: Aggiornamento di un ente esistente
-- **WHEN** un ente estratto è già presente nel database (stesso codice fiscale)
-- **THEN** il sistema aggiorna tutti i campi del record esistente con i nuovi valori e aggiorna il timestamp di aggiornamento
 
 ### Requirement: Tracciamento timestamp di aggiornamento
 Il sistema SHALL salvare per ciascun record la data e ora dell'ultima estrazione.
@@ -42,4 +38,15 @@ Il sistema SHALL stampare a fine esecuzione un riepilogo delle operazioni effett
 #### Scenario: Esecuzione completata
 - **WHEN** tutti gli enti sono stati processati e salvati
 - **THEN** il sistema stampa il numero di record inseriti, aggiornati e il totale presenti nel database
+
+### Requirement: Indici DB per le colonne di filtro principali
+Il sistema SHALL creare gli indici `idx_enti_sede_regione` su `enti(sede_regione)` e `idx_enti_sezione_registro` su `enti(sezione_registro)` tramite migrazione idempotente (`CREATE INDEX IF NOT EXISTS`).
+
+#### Scenario: Query filtrata su regione ottimizzata
+- **WHEN** si esegue `EXPLAIN QUERY PLAN SELECT * FROM enti WHERE sede_regione = 'Toscana'`
+- **THEN** il piano mostra l'uso di `idx_enti_sede_regione`
+
+#### Scenario: Migrazione idempotente
+- **WHEN** la migrazione viene eseguita su un DB che ha già gli indici
+- **THEN** non si verifica alcun errore e il DB rimane invariato
 
