@@ -5,6 +5,7 @@ import sqlite3
 import time
 import urllib.parse
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -71,16 +72,44 @@ def _nominatim_fetch(query: str) -> tuple[float, float] | None:
         raise RuntimeError(f"Richiesta HTTP fallita: {exc}") from exc
 
 
+def _cache_key(comune: str, provincia: str | None, regione: str | None) -> str:
+    parts = [
+        (comune or "").strip().lower(),
+        (provincia or "").strip().lower(),
+        (regione or "").strip().lower(),
+    ]
+    return "|".join(parts)
+
+
+def _lookup_cache(conn: sqlite3.Connection, key: str) -> tuple[float, float] | None:
+    row = conn.execute(
+        "SELECT lat, lon FROM geocoding_cache WHERE cache_key = ?", (key,)
+    ).fetchone()
+    if row:
+        return float(row["lat"]), float(row["lon"])
+    return None
+
+
+def _write_cache(conn: sqlite3.Connection, key: str, lat: float, lon: float, source: str) -> None:
+    ts = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        "INSERT OR REPLACE INTO geocoding_cache (cache_key, lat, lon, source, ts) VALUES (?, ?, ?, ?, ?)",
+        (key, lat, lon, source, ts),
+    )
+    conn.commit()
+
+
 def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        """SELECT id_runts, denominazione, sede_indirizzo, sede_civico, sede_cap, sede_comune
+        """SELECT id_runts, denominazione, sede_indirizzo, sede_civico, sede_cap, sede_comune,
+                  sede_provincia, sede_regione
            FROM enti WHERE lat IS NULL OR lon IS NULL
            ORDER BY denominazione"""
     ).fetchall()
 
     total = len(rows)
-    geocoded = skipped = not_found = errors = 0
+    geocoded = skipped = not_found = errors = from_cache = from_nominatim = 0
 
     with error_log_path.open("w", encoding="utf-8") as err_file:
         err_file.write(f"# Geocoder error log\n# Totale enti da processare: {total}\n\n")
@@ -96,6 +125,21 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
                 logger.warning(msg)
                 err_file.write(f"SALTATO  {msg}\n  → {_WEB_BASE}/ente/{id_runts}\n\n")
                 skipped += 1
+                continue
+
+            # Check cache before hitting Nominatim
+            key = _cache_key(comune, row["sede_provincia"], row["sede_regione"])
+            cached = _lookup_cache(conn, key)
+            if cached:
+                lat, lon = cached
+                conn.execute(
+                    "UPDATE enti SET lat = ?, lon = ? WHERE id_runts = ?",
+                    (lat, lon, id_runts),
+                )
+                conn.commit()
+                logger.info("%s\n  → %.6f, %.6f ✓  (da cache)", prefix, lat, lon)
+                geocoded += 1
+                from_cache += 1
                 continue
 
             queries = _build_queries(
@@ -131,11 +175,13 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
                     (lat, lon, id_runts),
                 )
                 conn.commit()
+                _write_cache(conn, key, lat, lon, "nominatim")
                 if winning_query != queries[0]:
                     logger.info("  → %.6f, %.6f ✓  (via fallback: %s)", lat, lon, winning_query)
                 else:
                     logger.info("  → %.6f, %.6f ✓", lat, lon)
                 geocoded += 1
+                from_nominatim += 1
             elif last_exc:
                 msg = (f"{prefix} — ERRORE HTTP: {last_exc}\n"
                        f"  Query tentate: {queries}")
@@ -150,8 +196,15 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
                 not_found += 1
                 errors += 1
 
-    return {"total": total, "geocoded": geocoded, "not_found": not_found,
-            "skipped": skipped, "errors": errors}
+    return {
+        "total": total,
+        "geocoded": geocoded,
+        "from_cache": from_cache,
+        "from_nominatim": from_nominatim,
+        "not_found": not_found,
+        "skipped": skipped,
+        "errors": errors,
+    }
 
 
 if __name__ == "__main__":
@@ -207,11 +260,13 @@ if __name__ == "__main__":
     print("=" * 55)
     print("  REPORT GEOCODIFICA")
     print("=" * 55)
-    print(f"  Totale processati  : {stats['total']}")
-    print(f"  Geocodificati ✓    : {stats['geocoded']}")
-    print(f"  Non trovati        : {stats['not_found']}")
-    print(f"  Errori HTTP        : {stats['errors']}")
-    print(f"  Saltati (no comune): {stats['skipped']}")
-    print(f"  Log principale     : {main_log.resolve()}")
-    print(f"  Log errori         : {error_log.resolve()}")
+    print(f"  Totale processati    : {stats['total']}")
+    print(f"  Geocodificati ✓      : {stats['geocoded']}")
+    print(f"    da cache           : {stats['from_cache']}")
+    print(f"    da Nominatim       : {stats['from_nominatim']}")
+    print(f"  Non trovati          : {stats['not_found']}")
+    print(f"  Errori HTTP          : {stats['errors']}")
+    print(f"  Saltati (no comune)  : {stats['skipped']}")
+    print(f"  Log principale       : {main_log.resolve()}")
+    print(f"  Log errori           : {error_log.resolve()}")
     print("=" * 55)

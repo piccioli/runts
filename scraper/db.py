@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS enti (
     raw_json          TEXT,
     updated_at        TEXT NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_enti_sede_regione ON enti(sede_regione);
+CREATE INDEX IF NOT EXISTS idx_enti_sezione_registro ON enti(sezione_registro);
+
+CREATE TABLE IF NOT EXISTS geocoding_cache (
+    cache_key TEXT PRIMARY KEY,
+    lat       REAL NOT NULL,
+    lon       REAL NOT NULL,
+    source    TEXT NOT NULL,
+    ts        TEXT NOT NULL
+);
 """
 
 _MIGRATIONS = [
@@ -37,6 +48,15 @@ _MIGRATIONS = [
     "ALTER TABLE enti ADD COLUMN sede_civico TEXT",
     "ALTER TABLE enti ADD COLUMN lat REAL",
     "ALTER TABLE enti ADD COLUMN lon REAL",
+    "CREATE INDEX IF NOT EXISTS idx_enti_sede_regione ON enti(sede_regione)",
+    "CREATE INDEX IF NOT EXISTS idx_enti_sezione_registro ON enti(sezione_registro)",
+    """CREATE TABLE IF NOT EXISTS geocoding_cache (
+        cache_key TEXT PRIMARY KEY,
+        lat       REAL NOT NULL,
+        lon       REAL NOT NULL,
+        source    TEXT NOT NULL,
+        ts        TEXT NOT NULL
+    )""",
 ]
 
 
@@ -49,13 +69,14 @@ def init_db(db_path: str) -> sqlite3.Connection:
         try:
             conn.execute(migration)
         except sqlite3.OperationalError:
-            pass  # column already exists
+            pass  # column/index/table already exists
     conn.commit()
     return conn
 
 
 def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
-    """Insert or replace an entity. Returns 'inserted' or 'updated'."""
+    """Insert or replace an entity. Returns 'inserted' or 'updated'.
+    Preserves existing lat/lon if not present in the input dict."""
     data = {k: v for k, v in data.items()}
     data["updated_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -66,10 +87,17 @@ def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
     if not id_runts:
         raise ValueError("Record senza id_runts né codice_fiscale, impossibile fare upsert")
 
-    existing = conn.execute(
-        "SELECT 1 FROM enti WHERE id_runts = ?", (id_runts,)
+    existing_row = conn.execute(
+        "SELECT lat, lon FROM enti WHERE id_runts = ?", (id_runts,)
     ).fetchone()
-    action = "updated" if existing else "inserted"
+    action = "updated" if existing_row else "inserted"
+
+    # Preserve coordinates already in DB if the incoming dict doesn't supply them
+    if existing_row:
+        if data.get("lat") is None and existing_row["lat"] is not None:
+            data["lat"] = existing_row["lat"]
+        if data.get("lon") is None and existing_row["lon"] is not None:
+            data["lon"] = existing_row["lon"]
 
     columns = [
         "id_runts", "codice_fiscale", "denominazione", "forma_giuridica",

@@ -3,6 +3,8 @@
 
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
 {% endblock %}
 
 {% block content %}
@@ -35,17 +37,23 @@
   </div>
 </form>
 
-{# Result count + toggle #}
+{# Result count + toggle + export #}
 {% if total == 0 %}
   <div class="alert alert-info">Nessun ente trovato.</div>
 {% else %}
-  <div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <p class="text-muted small mb-0">
       {{ total }} enti trovati — pagina {{ page }} di {{ total_pages }}
     </p>
-    <div class="btn-group btn-group-sm" role="group">
-      <button id="btn-lista" type="button" class="btn btn-primary" onclick="showLista()">Lista</button>
-      <button id="btn-mappa" type="button" class="btn btn-outline-primary" onclick="showMappa()">Mappa</button>
+    <div class="d-flex gap-2 align-items-center">
+      <div class="btn-group btn-group-sm" role="group">
+        <button id="btn-lista" type="button" class="btn btn-primary" onclick="showLista()">Lista</button>
+        <button id="btn-mappa" type="button" class="btn btn-outline-primary" onclick="showMappa()">Mappa</button>
+      </div>
+      <a href="/api/enti.csv?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}"
+         class="btn btn-sm btn-outline-secondary">Esporta CSV</a>
+      <a href="/api/enti.xlsx?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}"
+         class="btn btn-sm btn-outline-secondary">Esporta Excel</a>
     </div>
   </div>
 
@@ -105,24 +113,42 @@
 
   {# Map view #}
   <div id="view-mappa" style="display:none;">
-    <div id="map" style="height:520px; border-radius:0.5rem; overflow:hidden;"></div>
+    <div class="row g-0" style="height:520px; border-radius:0.5rem; overflow:hidden; border:1px solid #dee2e6;">
+      {# Sidebar filtri #}
+      <div id="map-sidebar" class="col-auto bg-white border-end" style="width:220px; overflow-y:auto; padding:12px;">
+        <p class="fw-semibold small mb-2">Regioni</p>
+        <div id="sidebar-regioni" class="mb-3"></div>
+        <p class="fw-semibold small mb-2">Sezioni registro</p>
+        <div id="sidebar-sezioni"></div>
+      </div>
+      {# Map #}
+      <div class="col">
+        <div id="map" style="height:100%;"></div>
+      </div>
+    </div>
+    <p id="map-count" class="text-muted small mt-1"></p>
   </div>
 
-  {# Geo data for Leaflet #}
-  <script>
-    var ENTI_GEO = {{ enti | map(attribute='__iter__') | list | tojson if false else '[]' }};
-    ENTI_GEO = [
-      {% for e in enti %}
-      {% if e.lat and e.lon %}
-      {"id": {{ e.id_runts | tojson }}, "nome": {{ e.denominazione | tojson }}, "lat": {{ e.lat }}, "lon": {{ e.lon }}},
-      {% endif %}
-      {% endfor %}
-    ];
-  </script>
-
   <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <script>
     var map = null;
+    var clusterGroup = null;
+    var allFeatures = [];       // raw GeoJSON features from API
+    var activeRegioni = new Set();
+    var activeSezioni = new Set();
+
+    var CURRENT_Q = {{ q | tojson }};
+    var CURRENT_REGIONE = {{ regione | tojson }};
+    var CURRENT_SEZIONE = {{ sezione_registro | tojson }};
+
+    function buildGeoJsonUrl() {
+      var params = new URLSearchParams();
+      if (CURRENT_Q) params.set('q', CURRENT_Q);
+      if (CURRENT_REGIONE) params.set('regione', CURRENT_REGIONE);
+      if (CURRENT_SEZIONE) params.set('sezione_registro', CURRENT_SEZIONE);
+      return '/api/enti.geojson?' + params.toString();
+    }
 
     function initMap() {
       if (map) return;
@@ -131,22 +157,94 @@
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 18
       }).addTo(map);
+      map.setView([42.5, 12.5], 6);
+    }
 
-      if (ENTI_GEO.length === 0) {
-        map.setView([42.5, 12.5], 6);
-        L.popup().setLatLng([42.5, 12.5])
-          .setContent("Nessun ente con coordinate disponibili")
-          .openOn(map);
-        return;
+    function buildSidebar() {
+      // Collect unique values from loaded features
+      var regSet = {}, sezSet = {};
+      allFeatures.forEach(function(f) {
+        var p = f.properties;
+        if (p.sede_regione) regSet[p.sede_regione] = (regSet[p.sede_regione] || 0) + 1;
+        if (p.sezione_registro) sezSet[p.sezione_registro] = (sezSet[p.sezione_registro] || 0) + 1;
+      });
+
+      function makeCheckboxes(container, map_counts, activeSet, onChange) {
+        var el = document.getElementById(container);
+        el.innerHTML = '';
+        Object.keys(map_counts).sort().forEach(function(val) {
+          var checked = activeSet.size === 0 || activeSet.has(val);
+          var div = document.createElement('div');
+          div.className = 'form-check';
+          div.innerHTML = '<input class="form-check-input" type="checkbox" id="cb_' + btoa(val) + '" ' +
+            (checked ? 'checked' : '') + '>' +
+            '<label class="form-check-label small" for="cb_' + btoa(val) + '">' +
+            val + ' <span class="text-muted">(' + map_counts[val] + ')</span></label>';
+          div.querySelector('input').addEventListener('change', function() {
+            onChange(val, this.checked);
+          });
+          el.appendChild(div);
+        });
       }
 
-      var bounds = [];
-      ENTI_GEO.forEach(function(e) {
-        var marker = L.marker([e.lat, e.lon]).addTo(map);
-        marker.bindPopup('<strong>' + e.nome + '</strong><br><a href="/ente/' + encodeURIComponent(e.id) + '">Vedi dettaglio</a>');
-        bounds.push([e.lat, e.lon]);
+      makeCheckboxes('sidebar-regioni', regSet, activeRegioni, function(val, checked) {
+        if (checked) activeRegioni.delete(val); else activeRegioni.add(val);
+        renderMarkers();
+        syncUrl();
       });
-      map.fitBounds(bounds, {padding: [30, 30]});
+      makeCheckboxes('sidebar-sezioni', sezSet, activeSezioni, function(val, checked) {
+        if (checked) activeSezioni.delete(val); else activeSezioni.add(val);
+        renderMarkers();
+        syncUrl();
+      });
+    }
+
+    function renderMarkers() {
+      if (clusterGroup) { map.removeLayer(clusterGroup); }
+      clusterGroup = L.markerClusterGroup();
+
+      var visible = allFeatures.filter(function(f) {
+        var p = f.properties;
+        var okReg = activeRegioni.size === 0 || !activeRegioni.has(p.sede_regione);
+        var okSez = activeSezioni.size === 0 || !activeSezioni.has(p.sezione_registro);
+        return okReg && okSez;
+      });
+
+      var bounds = [];
+      visible.forEach(function(f) {
+        var coords = f.geometry.coordinates; // [lon, lat]
+        var marker = L.marker([coords[1], coords[0]]);
+        marker.bindPopup(
+          '<strong>' + (f.properties.denominazione || '') + '</strong><br>' +
+          (f.properties.sede_comune || '') +
+          '<br><a href="/ente/' + encodeURIComponent(f.properties.id_runts) + '">Vedi dettaglio</a>'
+        );
+        clusterGroup.addLayer(marker);
+        bounds.push([coords[1], coords[0]]);
+      });
+
+      map.addLayer(clusterGroup);
+      if (bounds.length > 0) map.fitBounds(bounds, {padding: [30, 30]});
+
+      var countEl = document.getElementById('map-count');
+      if (countEl) countEl.textContent = visible.length + ' enti visibili su ' + allFeatures.length + ' totali';
+    }
+
+    function syncUrl() {
+      var params = new URLSearchParams(window.location.search);
+      // Keep list params as-is, just note the view is mappa
+      history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+    }
+
+    function fetchAndRenderMap() {
+      fetch(buildGeoJsonUrl())
+        .then(function(r) { return r.json(); })
+        .then(function(geojson) {
+          allFeatures = geojson.features || [];
+          buildSidebar();
+          renderMarkers();
+        })
+        .catch(function(err) { console.error('GeoJSON fetch error:', err); });
     }
 
     function showLista() {
@@ -163,6 +261,7 @@
       document.getElementById('btn-mappa').className = 'btn btn-primary';
       initMap();
       if (map) { map.invalidateSize(); }
+      if (allFeatures.length === 0) { fetchAndRenderMap(); }
     }
   </script>
 {% endif %}

@@ -55,13 +55,16 @@
 
     </dl>
   </div>
-  {% if ente.url_dettaglio %}
-  <div class="card-footer text-end">
+  <div class="card-footer d-flex justify-content-end gap-2">
+    <a href="/ente/{{ ente.id_runts }}/pdf" class="btn btn-sm btn-outline-secondary">
+      Scarica scheda PDF
+    </a>
+    {% if ente.url_dettaglio %}
     <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
       Vedi su RUNTS ↗
     </a>
+    {% endif %}
   </div>
-  {% endif %}
 </div>
 
 {% if lat and lon %}

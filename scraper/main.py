@@ -59,7 +59,7 @@ async def main() -> None:
     # 2. Scrape
     logger.info("Avvio scraping (headless=%s, delay=%dms)...", args.headless, args.delay)
     try:
-        entities = await run_scraper(
+        entities, retry_stats = await run_scraper(
             denominazione="CLUB ALPINO ITALIANO",
             headless=args.headless,
             delay_ms=args.delay,
@@ -87,15 +87,20 @@ async def main() -> None:
     # 4. Report finale
     stats_after = get_stats(init_db(args.db))
     print()
-    print("=" * 50)
+    print("=" * 55)
     print("  REPORT FINALE")
-    print("=" * 50)
-    print(f"  Enti processati  : {len(entities)}")
-    print(f"  Inseriti         : {inserted}")
-    print(f"  Aggiornati       : {updated}")
-    print(f"  Errori salvataggio: {errors}")
-    print(f"  Totale nel DB    : {stats_after['total']}  (prima: {stats_before['total']})")
-    print("=" * 50)
+    print("=" * 55)
+    print(f"  Enti processati          : {len(entities)}")
+    print(f"  Inseriti                 : {inserted}")
+    print(f"  Aggiornati               : {updated}")
+    print(f"  Errori salvataggio       : {errors}")
+    print(f"  Totale nel DB            : {stats_after['total']}  (prima: {stats_before['total']})")
+    print()
+    print(f"  Recuperati al 1° tentativo: {retry_stats['attempt_1']}")
+    print(f"  Recuperati al 2° tentativo: {retry_stats['attempt_2']}")
+    print(f"  Recuperati al 3° tentativo: {retry_stats['attempt_3']}")
+    print(f"  Falliti definitivamente   : {retry_stats['failed_after_retry']}")
+    print("=" * 55)
 
 
 if __name__ == "__main__":

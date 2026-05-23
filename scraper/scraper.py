@@ -326,12 +326,14 @@ async def run_scraper(
     denominazione: str = "CLUB ALPINO ITALIANO",
     headless: bool = True,
     delay_ms: int = 500,
-) -> list[dict]:
+) -> tuple[list[dict], dict]:
     """
     Full scrape: search → paginate → extract detail for each ente.
-    Returns list of entity dicts ready for upsert.
+    Returns (entities, retry_stats) where retry_stats has keys:
+    attempt_1, attempt_2, attempt_3, failed_after_retry.
     """
     all_entities: list[dict] = []
+    retry_stats = {"attempt_1": 0, "attempt_2": 0, "attempt_3": 0, "failed_after_retry": 0}
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=headless)
@@ -374,18 +376,47 @@ async def run_scraper(
                         len(all_entities) + 1, total_items, den
                     )
 
-                    try:
-                        # Re-find buttons after each back navigation
-                        btn = page.locator('input[value="Dettaglio"]').nth(i)
-                        await btn.click()
+                    fields = None
+                    for attempt in range(3):
+                        try:
+                            # Re-find buttons after each back navigation
+                            btn = page.locator('input[value="Dettaglio"]').nth(i)
+                            await btn.click()
 
-                        # Wait for navigation to /Ente
-                        await page.wait_for_url(DETAIL_URL_PATTERN, timeout=15000)
-                        await page.wait_for_load_state("networkidle", timeout=20000)
+                            # Wait for navigation to /Ente
+                            await page.wait_for_url(DETAIL_URL_PATTERN, timeout=15000)
+                            await page.wait_for_load_state("networkidle", timeout=20000)
 
-                        # The detail content renders after networkidle via DNN JS
-                        fields = await extract_fields(page)
-                        fields.update({k: v for k, v in meta.items() if v and k not in fields})
+                            # The detail content renders after networkidle via DNN JS
+                            fields = await extract_fields(page)
+                            fields.update({k: v for k, v in meta.items() if v and k not in fields})
+                            retry_stats[f"attempt_{attempt + 1}"] += 1
+                            break
+                        except Exception as exc:
+                            if attempt < 2:
+                                logger.warning(
+                                    "Errore su ente '%s' (tentativo %d/3): %s — retry tra %ds",
+                                    den, attempt + 1, exc, 2 ** attempt,
+                                )
+                                try:
+                                    if "/Ente" in page.url:
+                                        await _back_to_results(page)
+                                except Exception:
+                                    pass
+                                await asyncio.sleep(2 ** attempt)
+                            else:
+                                logger.error("Errore definitivo su ente '%s' dopo 3 tentativi: %s", den, exc)
+                                retry_stats["failed_after_retry"] += 1
+                                try:
+                                    if "/Ente" in page.url:
+                                        await _back_to_results(page)
+                                except Exception:
+                                    await search_enti(page, denominazione)
+                                    for _ in range(cur - 1):
+                                        if not await _go_to_next_page(page):
+                                            break
+
+                    if fields is not None:
                         all_entities.append(fields)
 
                         if delay_ms > 0:
@@ -400,17 +431,8 @@ async def run_scraper(
                                 if not await _go_to_next_page(page):
                                     break
                             row_meta = await _collect_row_metadata(page)
-
-                    except Exception as exc:
-                        logger.error("Errore su ente %d ('%s'): %s", i + 1, den, exc)
-                        try:
-                            if "/Ente" in page.url:
-                                await _back_to_results(page)
-                        except Exception:
-                            await search_enti(page, denominazione)
-                            for _ in range(cur - 1):
-                                if not await _go_to_next_page(page):
-                                    break
+                    else:
+                        pass  # already handled in the retry loop
 
                 if cur >= tot:
                     break
@@ -422,4 +444,4 @@ async def run_scraper(
             await browser.close()
 
     logger.info("Scraping completato. Totale enti estratti: %d", len(all_entities))
-    return all_entities
+    return all_entities, retry_stats
