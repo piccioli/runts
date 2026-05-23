@@ -55,10 +55,10 @@
 
 ## 9. Verifica e collaudo
 
-- [ ] 9.1 Rilanciare scraper su 3-4 enti già geocodificati e verificare che `lat`/`lon` siano ancora presenti nel DB
-- [ ] 9.2 Aprire la mappa con filtro regionale e verificare che tutti i marker della regione siano visibili (non solo i 20 della pagina)
-- [ ] 9.3 Esportare CSV e Excel, aprirli in LibreOffice/Excel e verificare encoding + caratteri italiani
-- [ ] 9.4 Generare scheda PDF di CAI Pisa (`id_runts=83894`), verificare layout + carta intestata
+- [x] 9.1 Rilanciare scraper su 3-4 enti già geocodificati e verificare che `lat`/`lon` siano ancora presenti nel DB
+- [x] 9.2 Aprire la mappa con filtro regionale e verificare che tutti i marker della regione siano visibili (non solo i 20 della pagina)
+- [x] 9.3 Esportare CSV e Excel, aprirli in LibreOffice/Excel e verificare encoding + caratteri italiani
+- [x] 9.4 Generare scheda PDF di CAI Pisa (`id_runts=83894`), verificare layout + carta intestata
 - [x] 9.5 Eseguire `EXPLAIN QUERY PLAN SELECT * FROM enti WHERE sede_regione = 'Toscana'` e verificare uso di `idx_enti_sede_regione`
-- [ ] 9.6 Eseguire geocoder due volte di fila: il secondo run deve avere `from_cache` > 0
-- [ ] 9.7 Ricostruire il container Docker (`docker compose build --no-cache`) e verificare che tutto funzioni in produzione
+- [x] 9.6 Eseguire geocoder due volte di fila: il secondo run deve avere `from_cache` > 0
+- [x] 9.7 Ricostruire il container Docker (`docker compose build --no-cache`) e verificare che tutto funzioni in produzione
