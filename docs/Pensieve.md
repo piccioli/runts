@@ -36,7 +36,7 @@
 - `[db]` **Versionamento schema** con `PRAGMA user_version` e migrazioni numerate, invece di lista `_MIGRATIONS` con try/except. Pulisce la gestione e permette downgrade.
 - `[db]` **Storia delle modifiche** — tabella `enti_history` che conserva versioni precedenti dei record, con `valid_from` / `valid_to`. Permette di rispondere a domande tipo "quando ha cambiato sede questo ente?".
 
-### Geocoder
+### Geocoder 
 - `[geo]` **Geocodifica più precisa** usando indirizzo + civico + CAP quando disponibili, con fallback a comune+regione se non si trova nulla.
 - `[geo]` **Cache locale dei comuni** già geocodificati (vedi sopra) per ridurre richieste e tempo.
 - `[geo]` **Provider alternativo** opzionale (es. Photon, MapTiler) come fallback quando Nominatim non trova nulla.
@@ -63,6 +63,22 @@
 
 ## TODO
 
+- `[scraper]` **Documenti allegati** Scaricare i documenti allegati alle pagine RUNTS asociandoli ai rispettivi enti 
+- `[scraper]` **Analisi Documenti allegati** Analizzare i documenti allegati di bilancio e patrimonio per aggiungere informazioni alla scheda ente 
+- `[scraper]` **Presidente** Recuperare le informazioni che riguardano il presidente dell'Ente e salvarle nel DB
+- `[scraper]` **Consiglieri** Recuperare le informazioni che riguardano i consiglieri dell'Ente e salvarle nel DB
+- `[scraper]` **Alter cariche** Recuperare le informazioni che riguardano le altre cariche dell'Ente e salvarle nel DB
+- `[web][ux]` **Allegati RUNTS** Mopstrare nella scheda ente gli allegati scaricabili classificati per tipo
+- `[web][ux]` **Allegati RUNTS** Mostrare nella scheda ente i metadati relativi agli allegati scaricati
+- `[web][ux]` **Persone** Mostrare nella scheda ente i metadati relativi agli allegati scaricati
+- `[web][ux]` **PDF** Aggiornare il PDF scaricabile dall'ente con info relative Allegati / Metadati allegati / Persone
+
+
+---
+
+## DONE
+
+REV 001:
 - `[web][ux]` Mappa con **tutti gli enti del filtro corrente**, non solo quelli della pagina. Endpoint dedicato `/api/enti.geojson?<filtri>` o array JSON inline più ampio. Oggi la mappa nella lista mostra solo 20 marker per pagina ed è poco utile per la visione d'insieme.
 - `[web][ux]` **Clustering dei marker** con `Leaflet.markercluster` quando ci sono molti enti vicini. Esplicitamente "out of scope" nel design originale della mappa, ma con ~226 sezioni CAI il valore si vede già.
 - `[web][ux]` **Filtri laterali sulla mappa** — sidebar con elenco regioni/sezioni che agisce live sui marker via JS, mantenendo l'URL aggiornato.
@@ -72,10 +88,3 @@
 - `[scraper]` **Retry automatico** su singolo ente in caso di errore di rete o timeout (oggi viene saltato). Backoff esponenziale, max 3 tentativi.
 - `[db]` **Indici** su `sede_regione` e `sezione_registro` per quando il dataset cresce (oggi i filtri fanno scan completi).
 - `[db]` **Tabella `geocoding_cache`** comune → (lat, lon, ts) condivisa, per non ri-interrogare Nominatim se due enti hanno stesso comune.
-
-
----
-
-## DONE
-
-_(vuoto — qui finiranno le idee dopo l'effettivo rilascio, con riferimento alla release e mini-retrospettiva)_
