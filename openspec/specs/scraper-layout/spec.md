@@ -1,3 +1,8 @@
+# Spec: Scraper Layout
+
+## Purpose
+Definire la struttura delle directory e dei moduli del progetto, con separazione netta tra scraper e app web.
+
 ## Requirements
 
 ### Requirement: Codice scraper isolato in directory dedicata

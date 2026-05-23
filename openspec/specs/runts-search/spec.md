@@ -1,3 +1,10 @@
+# Spec: RUNTS Search
+
+## Purpose
+Definire come il sistema esegue la ricerca degli enti sul portale RUNTS e raccoglie i riferimenti a tutti i risultati paginati prima di procedere all'estrazione dei dettagli.
+
+## Requirements
+
 ### Requirement: Ricerca enti per denominazione
 Il sistema SHALL eseguire una ricerca sul portale RUNTS compilando il campo "DENOMINAZIONE" con il valore "CLUB ALPINO ITALIANO" e avviando la ricerca tramite automazione browser.
 

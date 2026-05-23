@@ -1,11 +1,14 @@
-## ADDED Requirements
+# Spec: Ente Detail
 
+## Purpose
+Definire la pagina di dettaglio del singolo ente, che espone tutti i campi disponibili e permette la navigazione verso il portale RUNTS ufficiale.
+## Requirements
 ### Requirement: Pagina di dettaglio del singolo ente
-Il sistema SHALL esporre una route `/ente/<id_runts>` che mostra tutti i campi disponibili per quell'ente.
+Il sistema SHALL esporre una route `/ente/<id_runts>` che mostra tutti i campi disponibili per quell'ente, inclusi i nuovi campi `sede_stato` e `sede_civico`.
 
 #### Scenario: Ente trovato
 - **WHEN** l'utente accede a `/ente/<id_runts>` con un ID valido
-- **THEN** il sistema mostra una pagina con tutti i campi non nulli dell'ente: denominazione, codice fiscale, forma giuridica, natura giuridica, sede (indirizzo, comune, provincia, regione, CAP), data iscrizione, sezione del registro, PEC, sito web, rappresentante legale e URL dettaglio RUNTS
+- **THEN** il sistema mostra una pagina con tutti i campi non nulli dell'ente: denominazione, codice fiscale, forma giuridica, natura giuridica, sede (stato, indirizzo, civico, comune, provincia, regione, CAP), data iscrizione, sezione del registro, PEC, sito web, rappresentante legale e URL dettaglio RUNTS
 
 #### Scenario: Ente non trovato
 - **WHEN** l'utente accede a `/ente/<id_runts>` con un ID non presente nel DB
@@ -28,3 +31,15 @@ Il sistema SHALL mostrare nella pagina di dettaglio un link diretto alla scheda 
 #### Scenario: URL dettaglio disponibile
 - **WHEN** il campo `url_dettaglio` è valorizzato
 - **THEN** il sistema mostra un link "Vedi su RUNTS" che apre l'URL in una nuova scheda
+
+### Requirement: Mappa della sede legale
+Il sistema SHALL mostrare nella pagina di dettaglio una mappa interattiva della sede legale quando le coordinate geografiche sono disponibili.
+
+#### Scenario: Coordinate disponibili
+- **WHEN** i campi `lat` e `lon` dell'ente sono valorizzati nel database
+- **THEN** il sistema mostra una mappa Leaflet centrata sulle coordinate con un marker e popup con la denominazione dell'ente
+
+#### Scenario: Coordinate non disponibili
+- **WHEN** i campi `lat` e `lon` dell'ente sono NULL nel database
+- **THEN** il sistema non mostra la sezione mappa e non carica le librerie Leaflet
+

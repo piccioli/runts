@@ -1,4 +1,9 @@
-## ADDED Requirements
+# Spec: Web Docker
+
+## Purpose
+Definire la containerizzazione dell'applicazione web tramite Docker, con separazione tra scraper (host) e web app (container) che condividono solo il file `runts.db`.
+
+## Requirements
 
 ### Requirement: Containerizzazione dell'applicazione web
 Il sistema SHALL fornire un `Dockerfile` e un `docker-compose.yml` che permettono di avviare l'applicazione web con il comando `docker compose up`.
