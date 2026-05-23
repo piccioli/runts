@@ -10,16 +10,92 @@ logger = logging.getLogger(__name__)
 SEARCH_URL = "https://servizi.lavoro.gov.it/runts/it-it/Ricerca-enti"
 DETAIL_URL_PATTERN = "**/Ricerca-enti/Ente*"
 
-# IDs present on the detail page
+# IDs present on the detail page (sede fields handled by _EXTRACT_SEDE_LEGALE_JS)
 _DETAIL_IDS = {
-    "id_runts":         "spnRepertorio",
-    "codice_fiscale":   "spnCodiceFiscale",
-    "pec":              "spnEmailPec",
-    "sito_web":         "spnSitoInternet",
-    "sede_provincia":   "spnSedeProvincia",
-    "sede_comune":      "spnSedeComune",
-    "sede_regione":     "spnSedeRegione",
+    "id_runts":       "spnRepertorio",
+    "codice_fiscale": "spnCodiceFiscale",
+    "pec":            "spnEmailPec",
+    "sito_web":       "spnSitoInternet",
 }
+
+_PROVINCIA_TO_REGIONE: dict[str, str] = {
+    # Valle d'Aosta
+    "AO": "Valle d'Aosta",
+    # Piemonte
+    "AL": "Piemonte", "AT": "Piemonte", "BI": "Piemonte", "CN": "Piemonte",
+    "NO": "Piemonte", "TO": "Piemonte", "VB": "Piemonte", "VC": "Piemonte",
+    # Liguria
+    "GE": "Liguria", "IM": "Liguria", "SP": "Liguria", "SV": "Liguria",
+    # Lombardia
+    "BG": "Lombardia", "BS": "Lombardia", "CO": "Lombardia", "CR": "Lombardia",
+    "LC": "Lombardia", "LO": "Lombardia", "MB": "Lombardia", "MI": "Lombardia",
+    "MN": "Lombardia", "PV": "Lombardia", "SO": "Lombardia", "VA": "Lombardia",
+    # Trentino-Alto Adige
+    "BZ": "Trentino-Alto Adige", "TN": "Trentino-Alto Adige",
+    # Veneto
+    "BL": "Veneto", "PD": "Veneto", "RO": "Veneto", "TV": "Veneto",
+    "VE": "Veneto", "VI": "Veneto", "VR": "Veneto",
+    # Friuli-Venezia Giulia
+    "GO": "Friuli-Venezia Giulia", "PN": "Friuli-Venezia Giulia",
+    "TS": "Friuli-Venezia Giulia", "UD": "Friuli-Venezia Giulia",
+    # Emilia-Romagna
+    "BO": "Emilia-Romagna", "FE": "Emilia-Romagna", "FC": "Emilia-Romagna",
+    "MO": "Emilia-Romagna", "PR": "Emilia-Romagna", "PC": "Emilia-Romagna",
+    "RA": "Emilia-Romagna", "RE": "Emilia-Romagna", "RN": "Emilia-Romagna",
+    # Toscana
+    "AR": "Toscana", "FI": "Toscana", "GR": "Toscana", "LI": "Toscana",
+    "LU": "Toscana", "MS": "Toscana", "PI": "Toscana", "PT": "Toscana",
+    "PO": "Toscana", "SI": "Toscana",
+    # Umbria
+    "PG": "Umbria", "TR": "Umbria",
+    # Marche
+    "AN": "Marche", "AP": "Marche", "FM": "Marche", "MC": "Marche", "PU": "Marche",
+    # Lazio
+    "FR": "Lazio", "LT": "Lazio", "RI": "Lazio", "RM": "Lazio", "VT": "Lazio",
+    # Abruzzo
+    "AQ": "Abruzzo", "CH": "Abruzzo", "PE": "Abruzzo", "TE": "Abruzzo",
+    # Molise
+    "CB": "Molise", "IS": "Molise",
+    # Campania
+    "AV": "Campania", "BN": "Campania", "CE": "Campania", "NA": "Campania", "SA": "Campania",
+    # Puglia
+    "BA": "Puglia", "BT": "Puglia", "BR": "Puglia", "FG": "Puglia",
+    "LE": "Puglia", "TA": "Puglia",
+    # Basilicata
+    "MT": "Basilicata", "PZ": "Basilicata",
+    # Calabria
+    "CZ": "Calabria", "CS": "Calabria", "KR": "Calabria", "RC": "Calabria", "VV": "Calabria",
+    # Sicilia
+    "AG": "Sicilia", "CL": "Sicilia", "CT": "Sicilia", "EN": "Sicilia",
+    "ME": "Sicilia", "PA": "Sicilia", "RG": "Sicilia", "SR": "Sicilia", "TP": "Sicilia",
+    # Sardegna
+    "CA": "Sardegna", "CI": "Sardegna", "MD": "Sardegna", "NU": "Sardegna",
+    "OG": "Sardegna", "OR": "Sardegna", "OT": "Sardegna", "SS": "Sardegna",
+    "SU": "Sardegna", "VS": "Sardegna",
+}
+
+# Extracts sede legale fields from the divSedeLegale container (IDs use SL suffix).
+_EXTRACT_SEDE_LEGALE_JS = """
+() => {
+    const result = {};
+    const container = document.querySelector('[id*="divSedeLegale"]');
+    const scope = container || document;
+    const fields = {
+        'stato':     '[id*="spnStatoSL"]',
+        'provincia': '[id*="spnProvinciaSL"]',
+        'comune':    '[id*="spnComuneSL"]',
+        'indirizzo': '[id*="spnIndirizzoSL"]',
+        'civico':    '[id*="spnCivicoSL"]',
+        'cap':       '[id*="spnCAP_SL"]',
+        'regione':   '[id*="spnRegioneSL"]',
+    };
+    for (const [key, sel] of Object.entries(fields)) {
+        const el = scope.querySelector(sel);
+        if (el) { const v = el.innerText.trim(); if (v) result[key] = v; }
+    }
+    return result;
+}
+"""
 
 _EXTRACT_BOLD_JS = """
 () => {
@@ -155,20 +231,33 @@ async def extract_fields(page: Page) -> dict:
         if await el.count() > 0:
             data[key] = (await el.inner_text()).strip() or None
 
-    # Sede indirizzo + civico (might be separate elements)
-    indirizzo_parts = []
-    for id_part in ["spnSedeIndirizzo", "spnSedeCivico"]:
-        el = page.locator(f'[id*="{id_part}"]').first
-        if await el.count() > 0:
-            val = (await el.inner_text()).strip()
-            if val:
-                indirizzo_parts.append(val)
-    if indirizzo_parts:
-        data["sede_indirizzo"] = " ".join(indirizzo_parts)
-
-    sede_cap_el = page.locator('[id*="spnSedeCap"]').first
-    if await sede_cap_el.count() > 0:
-        data["sede_cap"] = (await sede_cap_el.inner_text()).strip() or None
+    # Sede legale: scoped JS extraction
+    try:
+        sede: dict = await page.evaluate(_EXTRACT_SEDE_LEGALE_JS)
+        if sede.get("stato"):
+            data["sede_stato"] = sede["stato"]
+        if sede.get("provincia"):
+            data["sede_provincia"] = sede["provincia"]
+        if sede.get("comune"):
+            data["sede_comune"] = sede["comune"]
+        if sede.get("indirizzo"):
+            data["sede_indirizzo"] = sede["indirizzo"]
+        if sede.get("civico"):
+            data["sede_civico"] = sede["civico"]
+        if sede.get("cap"):
+            data["sede_cap"] = sede["cap"]
+        if sede.get("regione"):
+            data["sede_regione"] = sede["regione"]
+        # Derive regione from province code if not available from DOM
+        if not data.get("sede_regione") and data.get("sede_provincia"):
+            prov = data["sede_provincia"].strip().upper()
+            regione = _PROVINCIA_TO_REGIONE.get(prov)
+            if regione:
+                data["sede_regione"] = regione
+            else:
+                logger.debug("Provincia '%s' non trovata nel mapping regioni", prov)
+    except Exception as exc:
+        logger.debug("Sede legale JS extraction error: %s", exc)
 
     # Iscrizione date
     iscr_el = page.locator('[id*="spnIscrittoIl"]').first

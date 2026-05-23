@@ -11,7 +11,9 @@ CREATE TABLE IF NOT EXISTS enti (
     denominazione     TEXT,
     forma_giuridica   TEXT,
     natura_giuridica  TEXT,
+    sede_stato        TEXT,
     sede_indirizzo    TEXT,
+    sede_civico       TEXT,
     sede_comune       TEXT,
     sede_provincia    TEXT,
     sede_regione      TEXT,
@@ -28,12 +30,22 @@ CREATE TABLE IF NOT EXISTS enti (
 );
 """
 
+_MIGRATIONS = [
+    "ALTER TABLE enti ADD COLUMN sede_stato TEXT",
+    "ALTER TABLE enti ADD COLUMN sede_civico TEXT",
+]
+
 
 def init_db(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(SCHEMA)
+    for migration in _MIGRATIONS:
+        try:
+            conn.execute(migration)
+        except sqlite3.OperationalError:
+            pass  # column already exists
     conn.commit()
     return conn
 
@@ -57,9 +69,10 @@ def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
 
     columns = [
         "id_runts", "codice_fiscale", "denominazione", "forma_giuridica",
-        "natura_giuridica", "sede_indirizzo", "sede_comune", "sede_provincia",
-        "sede_regione", "sede_cap", "data_iscrizione", "sezione_registro",
-        "settori_attivita", "rappresentante_legale", "sito_web", "pec",
+        "natura_giuridica", "sede_stato", "sede_indirizzo", "sede_civico",
+        "sede_comune", "sede_provincia", "sede_regione", "sede_cap",
+        "data_iscrizione", "sezione_registro", "settori_attivita",
+        "rappresentante_legale", "sito_web", "pec",
         "url_dettaglio", "raw_json", "updated_at",
     ]
     row = {col: data.get(col) for col in columns}
