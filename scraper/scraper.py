@@ -196,6 +196,30 @@ async def extract_atti_documenti(page: Page) -> list[dict]:
         return []
 
 
+def _strip_p7m(path: "Path") -> "Path":
+    """Extract the inner file from a CAdES .p7m envelope using OpenSSL.
+
+    Returns the new path (without .p7m extension). Deletes the original .p7m.
+    Raises subprocess.CalledProcessError if OpenSSL fails.
+    """
+    import subprocess
+    from pathlib import Path as _Path
+
+    path = _Path(path)
+    if path.suffix.lower() != ".p7m":
+        return path
+
+    out_path = _Path(str(path)[:-4])  # remove .p7m
+    subprocess.run(
+        ["openssl", "cms", "-verify", "-noverify", "-inform", "DER",
+         "-in", str(path), "-out", str(out_path)],
+        check=True,
+        capture_output=True,
+    )
+    path.unlink()
+    return out_path
+
+
 async def _playwright_download_allegati(
     page: Page,
     allegati: list[dict],
@@ -242,6 +266,15 @@ async def _playwright_download_allegati(
 
             save_path = dest_dir / filename
             await download.save_as(str(save_path))
+
+            # Unwrap CAdES .p7m envelope → plain PDF
+            if save_path.suffix.lower() == ".p7m":
+                try:
+                    save_path = _strip_p7m(save_path)
+                    filename = save_path.name
+                    logger.info("  Estratto da .p7m → %s", filename)
+                except Exception as exc:
+                    logger.warning("  Conversione .p7m fallita per %s: %s", filename, exc)
 
             hasher = hashlib.sha256()
             with open(save_path, "rb") as f:

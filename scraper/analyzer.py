@@ -35,7 +35,7 @@ _PATTERNS: dict[str, list[str]] = {
     ],
     "totale_oneri": [
         r"[Tt]otale uscite della gestione\s+([\d\.,]+)",
-        r"[Tt]otale [Oo]neri e [Cc]osti[\s\S]{0,200}?([\d\.\s]+,\d{2})",
+        r"[Tt]otale [Oo]neri e [Cc]osti(?!\s*x\s*1)[\s\S]{0,200}?([\d\.\s]+,\d{2})",
     ],
     "proventi_a_interesse_generale": [
         r"[Tt]otale entrate da attivit[^\n]{1,20}interesse generale\s+([\d\.,]+)",
@@ -59,7 +59,7 @@ _PATTERNS: dict[str, list[str]] = {
     ],
     "totale_proventi": [
         r"[Tt]otale entrate della gestione\s+([\d\.,]+)",
-        r"[Tt]otale [Pp]roventi e [Rr]icavi[\s\S]{0,200}?([\d\.\s]+,\d{2})",
+        r"[Tt]otale [Pp]roventi e [Rr]icavi(?!\s*x\s*1)[\s\S]{0,200}?([\d\.\s]+,\d{2})",
     ],
     "risultato_ante_imposte": [
         r"[Aa]vanzo/disavanzo d.esercizio prima delle imposte[^0-9]+([\d\.,]+)",

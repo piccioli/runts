@@ -21,12 +21,17 @@
 ## IDEAS
 
 ### Web app & UX
+- `[web][ux]` **Suddivisione in tab della pagina dettaglio Sezione** Suddividere la vista della pagina in singole tab (Principale, ETS, Economics, Mappa, Persone)
+- `[web][ux]` **Cambiare contenuto lista Sezioni** La lsita delle sezioni deve arrivare dalla tabella "sezioni CAI"
+- `[web][ux]` **Cambiare contenuto lista Sezioni** Filtro Mostra solo Sezioni ETS
 - `[web][ux]` **Vista statistiche** (`/stats`) con grafici aggregati: enti per regione, per sezione di registro, distribuzione temporale per data di iscrizione. Chart.js via CDN.
 - `[web][ux]` **Filtri multipli**: selezione multipla di regioni/sezioni invece del singolo dropdown.
 - `[web][ux]` **Ricerca full-text** con SQLite FTS5 su denominazione + comune + indirizzo, per trovare un ente anche con typo o frammenti.
 - `[web][ux]` **Vista responsive ottimizzata** per consultazione da mobile, in particolare la tabella oggi è larga da scrollare orizzontalmente.
 
 ### Scraper
+- `[scraper]` **Documenti allegati** Scaricare i documenti allegati alle pagine RUNTS asociandoli ai rispettivi enti, versione OCR (caso di Parma come test) 
+- `[scraper]` **Aggiungere lo scraping dei dati provenienti dal CAI** Partendo da https://www.cai.it/sezioni-territoriali/sezioni-e-sottosezioni/ recuperare tutte le informazioni che riguardano le Sezioni (compreso codice Sezione e informazioni che riguardano le sottosezioni)
 - `[scraper]` **Parametrizzazione della denominazione** già esiste come parametro Python ma non è esposta a CLI; aggiungere `--denominazione` per riusare lo stesso codice su altre reti (es. UISP, FederTrek, ecc.).
 - `[scraper]` **Modalità incrementale**: opzione `--only-new` che salta gli `id_runts` già presenti, utile per esecuzioni veloci.
 - `[scraper]` **Estrazione di campi aggiuntivi**: settori di attività completi, organi sociali, importi del 5×1000 se presenti.
