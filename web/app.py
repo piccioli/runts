@@ -15,7 +15,37 @@ PAGE_SIZE = 20
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
+app.mount("/attachments", StaticFiles(directory=os.environ.get("ATTACHMENTS_DIR", "/app/attachments"), check_dir=False), name="attachments")
 templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))
+
+
+def _mask_cf(cf: str | None) -> str:
+    if not cf or len(cf) < 8:
+        return cf or "—"
+    return cf[:3] + "•••••" + cf[-5:]
+
+
+def _human_size(size: int | None) -> str:
+    if size is None:
+        return "—"
+    if size >= 1_048_576:
+        return f"{size / 1_048_576:.1f} MB"
+    return f"{size // 1024} KB"
+
+
+def _format_euro(value) -> str:
+    if value is None:
+        return "—"
+    try:
+        formatted = f"{float(value):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{formatted} €"
+    except (TypeError, ValueError):
+        return "—"
+
+
+templates.env.filters["mask_cf"] = _mask_cf
+templates.env.filters["human_size"] = _human_size
+templates.env.filters["format_euro"] = _format_euro
 
 
 def get_db():
@@ -27,6 +57,12 @@ def get_db():
 
 def _db_exists() -> bool:
     return os.path.exists(DB_PATH)
+
+
+def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone() is not None
 
 
 def _tr(request: Request, name: str, context: dict = {}, **kwargs):
@@ -134,11 +170,26 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
     conn = get_db()
     try:
         row = conn.execute("SELECT * FROM enti WHERE id_runts = ?", (id_runts,)).fetchone()
+        if row is None:
+            return _tr(request, "404.html", status_code=404)
+
+        allegati = conn.execute(
+            "SELECT * FROM allegati WHERE id_runts = ? ORDER BY codice_pratica, anno",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "allegati") else []
+
+        bilanci = conn.execute(
+            "SELECT * FROM bilanci WHERE id_runts = ? ORDER BY anno DESC",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "bilanci") else []
+
+        cariche = conn.execute(
+            "SELECT * FROM cariche_sociali WHERE id_runts = ? "
+            "ORDER BY (valid_to IS NULL) DESC, ruolo, cognome",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "cariche_sociali") else []
     finally:
         conn.close()
-
-    if row is None:
-        return _tr(request, "404.html", status_code=404)
 
     fields = {k: row[k] for k in row.keys() if row[k] is not None and k not in ("id_runts", "raw_json", "updated_at")}
     return _tr(request, "detail.html", {
@@ -147,6 +198,9 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
         "back": back or "/",
         "lat": row["lat"] if "lat" in row.keys() else None,
         "lon": row["lon"] if "lon" in row.keys() else None,
+        "allegati": allegati,
+        "bilanci": bilanci,
+        "cariche": cariche,
     })
 
 
@@ -158,14 +212,29 @@ async def ente_pdf(id_runts: str):
     conn = get_db()
     try:
         row = conn.execute("SELECT * FROM enti WHERE id_runts = ?", (id_runts,)).fetchone()
+        if row is None:
+            return Response(status_code=404)
+
+        allegati = conn.execute(
+            "SELECT * FROM allegati WHERE id_runts = ? ORDER BY codice_pratica, anno",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "allegati") else []
+
+        bilanci = conn.execute(
+            "SELECT * FROM bilanci WHERE id_runts = ? ORDER BY anno DESC",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "bilanci") else []
+
+        cariche = conn.execute(
+            "SELECT * FROM cariche_sociali WHERE id_runts = ? "
+            "ORDER BY (valid_to IS NULL) DESC, ruolo, cognome",
+            (id_runts,),
+        ).fetchall() if _table_exists(conn, "cariche_sociali") else []
     finally:
         conn.close()
 
-    if row is None:
-        return Response(status_code=404)
-
     from .pdf_utils import build_ente_pdf
-    pdf_bytes = build_ente_pdf(row)
+    pdf_bytes = build_ente_pdf(row, allegati=allegati, bilanci=bilanci, cariche=cariche)
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

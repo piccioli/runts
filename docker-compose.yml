@@ -5,6 +5,7 @@ services:
       - "8000:8000"
     volumes:
       - ./runts.db:/app/runts.db:ro
+      - ./attachments:/app/attachments:ro
     environment:
       - DB_PATH=/app/runts.db
     restart: unless-stopped

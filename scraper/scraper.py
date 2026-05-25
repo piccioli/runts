@@ -115,13 +115,209 @@ _EXTRACT_BOLD_JS = """
 """
 
 
-async def search_enti(page: Page, denominazione: str) -> None:
-    """Navigate to RUNTS, fill DENOMINAZIONE and submit the search."""
+_CODICE_PRATICA_MAP: dict[str, str] = {
+    "B00": "bilancio_esercizio",
+    "B03": "situazione_patrimoniale",
+    "B08": "bilancio_sociale",
+    "C01": "atto_costitutivo",
+    "C02": "statuto",
+    "D00": "dichiarazione",
+    "E32": "provvedimento_autorita",
+    "R06": "relazione_controllo",
+    "PROVISC": "provvedimento_iscrizione",
+    "99": "altro",
+}
+
+_RUOLO_MAP: dict[str, str] = {
+    "presidente": "presidente",
+    "vice presidente": "vicepresidente",
+    "vicepresidente": "vicepresidente",
+    "consigliere": "consigliere",
+    "segretario": "segretario",
+    "tesoriere": "tesoriere",
+    "revisore": "revisore",
+    "revisore dei conti": "revisore",
+    "organo di controllo": "revisore",
+}
+
+
+def classify_codice_pratica(codice_pratica: str) -> str:
+    return _CODICE_PRATICA_MAP.get(codice_pratica.strip().upper(), "altro")
+
+
+def normalize_ruolo(ruolo_raw: str) -> str:
+    key = ruolo_raw.lower().strip()
+    for pattern, canonical in _RUOLO_MAP.items():
+        if pattern in key:
+            return canonical
+    return "altro"
+
+
+async def extract_atti_documenti(page: Page) -> list[dict]:
+    """Extract the 'Atti e documenti' table from the RUNTS detail page."""
+    try:
+        # Find the heading containing "Atti e documenti"
+        heading = page.locator('text="Atti e documenti"').first
+        if await heading.count() == 0:
+            return []
+
+        # Find the nearest table sibling/descendant after the heading
+        table = page.locator('table').filter(has=page.locator('text="Codice pratica"')).first
+        if await table.count() == 0:
+            return []
+
+        rows = await table.locator("tbody tr").all()
+        results = []
+        for row in rows:
+            cells = await row.locator("td").all()
+            if len(cells) < 4:
+                continue
+
+            documento = (await cells[0].inner_text()).strip()
+            codice_pratica = (await cells[1].inner_text()).strip()
+            data_text = (await cells[2].inner_text()).strip()
+
+            anno = None
+            if data_text and data_text.isdigit():
+                anno = int(data_text)
+
+            if documento and codice_pratica:
+                results.append({
+                    "documento": documento,
+                    "codice_pratica": codice_pratica,
+                    "tipo": classify_codice_pratica(codice_pratica),
+                    "anno": anno,
+                    "url": None,
+                    "_row_index": len(results),
+                })
+        return results
+    except Exception as exc:
+        logger.debug("extract_atti_documenti error: %s", exc)
+        return []
+
+
+async def _playwright_download_allegati(
+    page: Page,
+    allegati: list[dict],
+    dest_dir: "Path",
+) -> list[dict]:
+    """Click each download button on the RUNTS detail page and save the file.
+
+    RUNTS uses ASP.NET WebForms image-buttons — there is no downloadable URL;
+    we must use the active Playwright session to trigger the form POST.
+    """
+    import hashlib
+    from pathlib import Path as _Path
+
+    dest_dir = _Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    enriched: list[dict] = []
+    used_names: set[str] = set()
+
+    for att in allegati:
+        idx = att.get("_row_index", 0)
+        selector = f'input[id*="gvAttiDocumenti_btnDownload_{idx}"]'
+
+        btn = page.locator(selector).first
+        if await btn.count() == 0:
+            enriched.append({**att, "skip_reason": "no_button"})
+            logger.warning("Download button non trovato: row %d", idx)
+            continue
+
+        try:
+            async with page.expect_download(timeout=30000) as dl_info:
+                await btn.click()
+            download = await dl_info.value
+
+            suggested = download.suggested_filename or f"allegato_{idx}.pdf"
+            base_name = f"{att.get('codice_pratica','XX')}_{att.get('anno') or 'nd'}_{suggested}"
+            filename = base_name
+            counter = 2
+            while filename in used_names or (dest_dir / filename).exists():
+                stem, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
+                filename = f"{base_name.rsplit('.', 1)[0]}_{counter}.{base_name.rsplit('.', 1)[1]}" if "." in base_name else f"{base_name}_{counter}"
+                counter += 1
+            used_names.add(filename)
+
+            save_path = dest_dir / filename
+            await download.save_as(str(save_path))
+
+            hasher = hashlib.sha256()
+            with open(save_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    hasher.update(chunk)
+
+            enriched.append({
+                **att,
+                "filename": filename,
+                "path": str(save_path),
+                "size": save_path.stat().st_size,
+                "hash_sha256": hasher.hexdigest(),
+                "mime": "application/pdf",
+                "url_originale": None,
+            })
+            logger.info("↓ Scaricato: %s", filename)
+        except Exception as exc:
+            logger.warning("Download fallito per allegato row %d (%s/%s): %s", idx, att.get("codice_pratica"), att.get("anno"), exc)
+            enriched.append({**att, "skip_reason": "download_error"})
+
+    return enriched
+
+
+async def extract_cariche(page: Page) -> list[dict]:
+    """Extract 'Organi sociali' entries from the RUNTS detail page."""
+    try:
+        section = page.locator('text="Organi sociali"').first
+        if await section.count() == 0:
+            return []
+
+        table = page.locator('table').filter(has=page.locator('text="Ruolo"')).first
+        if await table.count() == 0:
+            return []
+
+        rows = await table.locator("tbody tr").all()
+        results = []
+        for row in rows:
+            cells = await row.locator("td").all()
+            if len(cells) < 3:
+                continue
+
+            # Typical columns: Ruolo | Nome | Cognome | CF | Dal | Al
+            ruolo_raw = (await cells[0].inner_text()).strip()
+            nome = (await cells[1].inner_text()).strip() if len(cells) > 1 else None
+            cognome = (await cells[2].inner_text()).strip() if len(cells) > 2 else None
+            cf = (await cells[3].inner_text()).strip() if len(cells) > 3 else None
+            valid_from = (await cells[4].inner_text()).strip() if len(cells) > 4 else None
+            valid_to_raw = (await cells[5].inner_text()).strip() if len(cells) > 5 else None
+
+            if not ruolo_raw:
+                continue
+
+            results.append({
+                "ruolo": normalize_ruolo(ruolo_raw),
+                "nome": nome or None,
+                "cognome": cognome or None,
+                "codice_fiscale": cf or None,
+                "valid_from": valid_from or None,
+                "valid_to": valid_to_raw or None,
+            })
+        return results
+    except Exception as exc:
+        logger.debug("extract_cariche error: %s", exc)
+        return []
+
+
+async def search_enti(page: Page, denominazione: str, codice_fiscale: str | None = None) -> None:
+    """Navigate to RUNTS, fill search fields and submit."""
     logger.info("Navigazione alla pagina di ricerca RUNTS...")
     await page.goto(SEARCH_URL, wait_until="domcontentloaded")
     await page.wait_for_timeout(2000)
 
-    await page.fill('input[id*="denominazione" i]', denominazione)
+    if codice_fiscale:
+        await page.fill('input[id*="codiceFiscale" i]', codice_fiscale)
+    else:
+        await page.fill('input[id*="denominazione" i]', denominazione)
     await page.click('input[type="submit"]')
     logger.info("Ricerca avviata — attesa risultati...")
     # Wait for results table to appear
@@ -326,11 +522,15 @@ async def run_scraper(
     denominazione: str = "CLUB ALPINO ITALIANO",
     headless: bool = True,
     delay_ms: int = 500,
+    filter_denominazione: str | None = None,
+    codice_fiscale: str | None = None,
+    attachments_dir: "Path | None" = None,
 ) -> tuple[list[dict], dict]:
     """
     Full scrape: search → paginate → extract detail for each ente.
-    Returns (entities, retry_stats) where retry_stats has keys:
-    attempt_1, attempt_2, attempt_3, failed_after_retry.
+    Returns (entities, retry_stats). Each entity dict includes:
+    atti_documenti: list[dict] and cariche: list[dict] for further processing.
+    retry_stats keys: attempt_1, attempt_2, attempt_3, failed_after_retry.
     """
     all_entities: list[dict] = []
     retry_stats = {"attempt_1": 0, "attempt_2": 0, "attempt_3": 0, "failed_after_retry": 0}
@@ -348,7 +548,7 @@ async def run_scraper(
         page.on("dialog", lambda d: asyncio.ensure_future(d.accept()))
 
         try:
-            await search_enti(page, denominazione)
+            await search_enti(page, denominazione, codice_fiscale=codice_fiscale)
 
             total_items = await _get_total_items(page)
             _, total_pages = await _get_page_info(page)
@@ -390,6 +590,14 @@ async def run_scraper(
                             # The detail content renders after networkidle via DNN JS
                             fields = await extract_fields(page)
                             fields.update({k: v for k, v in meta.items() if v and k not in fields})
+                            atti = await extract_atti_documenti(page)
+                            if attachments_dir is not None and atti:
+                                id_r = fields.get("id_runts") or den
+                                from pathlib import Path as _Path
+                                ente_dir = _Path(attachments_dir) / str(id_r)
+                                atti = await _playwright_download_allegati(page, atti, ente_dir)
+                            fields["atti_documenti"] = atti
+                            fields["cariche"] = await extract_cariche(page)
                             retry_stats[f"attempt_{attempt + 1}"] += 1
                             break
                         except Exception as exc:
@@ -411,7 +619,7 @@ async def run_scraper(
                                     if "/Ente" in page.url:
                                         await _back_to_results(page)
                                 except Exception:
-                                    await search_enti(page, denominazione)
+                                    await search_enti(page, denominazione, codice_fiscale=codice_fiscale)
                                     for _ in range(cur - 1):
                                         if not await _go_to_next_page(page):
                                             break
@@ -426,7 +634,7 @@ async def run_scraper(
                         recovered = await _back_to_results(page)
                         if not recovered:
                             logger.warning("Back navigation failed — re-executing search and navigating to page %d", cur)
-                            await search_enti(page, denominazione)
+                            await search_enti(page, denominazione, codice_fiscale=codice_fiscale)
                             for _ in range(cur - 1):
                                 if not await _go_to_next_page(page):
                                     break

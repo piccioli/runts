@@ -8,7 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import (
-    Paragraph, Spacer, Table, TableStyle, KeepInFrame, SimpleDocTemplate
+    Paragraph, Spacer, Table, TableStyle, SimpleDocTemplate
 )
 from reportlab.pdfgen import canvas
 
@@ -43,7 +43,155 @@ def _row_value(row, key: str):
         return None
 
 
-def build_ente_pdf(ente_row: sqlite3.Row) -> bytes:
+def _fmt(value, decimals: int = 2) -> str:
+    if value is None:
+        return "—"
+    try:
+        return f"{float(value):,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _section_heading(title: str, styles) -> Paragraph:
+    st = ParagraphStyle(
+        "section_head",
+        parent=styles["Heading2"],
+        fontSize=10,
+        spaceBefore=14,
+        spaceAfter=4,
+        textColor=colors.HexColor("#1a1a2e"),
+    )
+    return Paragraph(title, st)
+
+
+def _build_allegati_section(allegati, styles) -> list:
+    if not allegati:
+        return []
+    cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8)
+    header_style = ParagraphStyle("hdr", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
+
+    rows = [[
+        Paragraph("Tipo", header_style),
+        Paragraph("Cod. pratica", header_style),
+        Paragraph("Anno", header_style),
+        Paragraph("Dimensione", header_style),
+        Paragraph("Link RUNTS", header_style),
+    ]]
+    for att in allegati:
+        try:
+            tipo = att["tipo"] or "—"
+            codice = att["codice_pratica"] or "—"
+            anno = str(att["anno"]) if att["anno"] else "—"
+            size = att["size"]
+            size_str = (f"{size // 1024} KB" if size and size < 1_048_576 else f"{size / 1_048_576:.1f} MB") if size else "—"
+            url = att["url_originale"] or ""
+            link_cell = Paragraph(f'<link href="{url}">↗</link>' if url else "—", cell_style)
+        except (KeyError, TypeError):
+            continue
+        rows.append([
+            Paragraph(tipo, cell_style),
+            Paragraph(codice, cell_style),
+            Paragraph(anno, cell_style),
+            Paragraph(size_str, cell_style),
+            link_cell,
+        ])
+
+    tbl = Table(rows, colWidths=[110, 70, 40, 60, 40])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f5f5f5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#e0e0e0")),
+    ]))
+    return [_section_heading("Atti e documenti", styles), tbl]
+
+
+def _build_bilanci_section(bilanci, styles) -> list:
+    if not bilanci:
+        return []
+    cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8)
+    header_style = ParagraphStyle("hdr", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
+    num_style = ParagraphStyle("num", parent=styles["Normal"], fontSize=8, alignment=2)
+
+    rows = [[
+        Paragraph("Anno", header_style),
+        Paragraph("Totale proventi", header_style),
+        Paragraph("Totale oneri", header_style),
+        Paragraph("Risultato", header_style),
+    ]]
+    for b in bilanci:
+        try:
+            anno = str(b["anno"]) if b["anno"] else "—"
+            proventi = _fmt(b["totale_proventi"])
+            oneri = _fmt(b["totale_oneri"])
+            risultato = b["risultato_esercizio"]
+            risultato_str = _fmt(risultato)
+            ris_color = colors.red if risultato is not None and float(risultato) < 0 else colors.black
+            ris_style = ParagraphStyle("ris", parent=styles["Normal"], fontSize=8, alignment=2, textColor=ris_color)
+        except (KeyError, TypeError):
+            continue
+        rows.append([
+            Paragraph(anno, cell_style),
+            Paragraph(proventi, num_style),
+            Paragraph(oneri, num_style),
+            Paragraph(risultato_str, ris_style),
+        ])
+
+    tbl = Table(rows, colWidths=[40, 110, 110, 110])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f5f5f5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#e0e0e0")),
+    ]))
+    return [_section_heading("Indicatori di bilancio", styles), tbl]
+
+
+def _build_cariche_section(cariche, styles) -> list:
+    if not cariche:
+        return []
+    cell_style = ParagraphStyle("cell", parent=styles["Normal"], fontSize=8)
+    hist_style = ParagraphStyle("hist", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
+    header_style = ParagraphStyle("hdr", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
+
+    rows = [[
+        Paragraph("Ruolo", header_style),
+        Paragraph("Nome", header_style),
+        Paragraph("Cognome", header_style),
+        Paragraph("Periodo", header_style),
+    ]]
+    for c in cariche:
+        try:
+            ruolo = c["ruolo"] or "—"
+            nome = c["nome"] or "—"
+            cognome = c["cognome"] or "—"
+            valid_from = c["valid_from"] or ""
+            valid_to = c["valid_to"]
+            periodo = f"{valid_from} – {valid_to}" if valid_to else f"dal {valid_from}"
+            st = cell_style if valid_to is None else hist_style
+        except (KeyError, TypeError):
+            continue
+        rows.append([
+            Paragraph(ruolo, st),
+            Paragraph(nome, st),
+            Paragraph(cognome, st),
+            Paragraph(periodo, st),
+        ])
+
+    tbl = Table(rows, colWidths=[90, 90, 90, 100])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f5f5f5")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#e0e0e0")),
+    ]))
+    return [_section_heading("Persone e cariche", styles), tbl]
+
+
+def build_ente_pdf(ente_row: sqlite3.Row, *, allegati=None, bilanci=None, cariche=None) -> bytes:
     """Generate a PDF sheet for an ente, overlaid with MS carta intestata."""
     buf = io.BytesIO()
 
@@ -111,10 +259,11 @@ def build_ente_pdf(ente_row: sqlite3.Row) -> bytes:
         ]))
         story.append(tbl)
 
-    # Wrap story in KeepInFrame to prevent overflow beyond available height
-    available_h = PAGE_H - TOP_MARGIN - BOTTOM_MARGIN
-    framed = KeepInFrame(content_w, available_h, story, mode="shrink")
-    doc.build([framed])
+    story.extend(_build_allegati_section(allegati or [], styles))
+    story.extend(_build_bilanci_section(bilanci or [], styles))
+    story.extend(_build_cariche_section(cariche or [], styles))
+
+    doc.build(story)
 
     content_bytes = buf.getvalue()
 
