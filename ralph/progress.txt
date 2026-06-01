@@ -4,7 +4,7 @@
 - No mypy installed in the venv; typecheck = syntax OK + pytest passing
 - `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
 - SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
-- `base.html` includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — add BS5 JS bundle directly in templates that need it
+- `base.html` includes Bootstrap 5 CSS and (since US-003) Bootstrap 5 JS bundle — no need to add it in individual templates
 - The `active_page` context var is used in base.html for nav-link active states (set by each route in app.py)
 
 # Ralph Progress Log
@@ -18,5 +18,39 @@ Started: Lun  1 Giu 2026
 - **Learnings for future iterations:**
   - Bootstrap 5 `sticky-top` on the `<nav>` element is sufficient — no CSS override needed
   - The container already has `pb-5` so content isn't hidden behind anything at the bottom
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-002
+- Added `<footer class="footer fixed-bottom bg-dark text-white py-2">` to `web/templates/base.html`
+- Footer shows 'Montagna Servizi S.C.P.A. — Via Errico Petrella 19, 20124 Milano — montagnaservizi.com'
+- Container already had `pb-5` so no additional padding needed
+- Files changed: `web/templates/base.html`
+- **Learnings for future iterations:**
+  - `fixed-bottom` footer is inside the `<body>` but outside the `.container` — place it after the closing `</div>` of the main container
+  - Bootstrap `pb-5` (3rem) is enough clearance for a `py-2` footer (~2.5rem tall)
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-003
+- Added 4 nav-link items to navbar in `web/templates/base.html`: Sezioni (/), Gruppi Regionali (/gruppi-regionali), ETS (/ets), Statistiche (/stats)
+- Active state uses `{% if active_page == '...' %}active{% endif %}` Jinja2 conditionals
+- Made navbar collapsible on mobile with `navbar-expand-lg` + `navbar-toggler` button + `collapse navbar-collapse` div
+- Added Bootstrap 5 JS bundle to base.html (required for the toggler; was previously absent)
+- Updated all 3 `_tr()` calls in the `/` route to pass `active_page='sezioni'`
+- Files changed: `web/templates/base.html`, `web/app.py`
+- **Learnings for future iterations:**
+  - Bootstrap JS must now be in base.html (added here for the toggler) — no need to add it in individual templates
+  - Future routes (/ets, /gruppi-regionali, /stats) must pass `active_page` matching their menu key
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-004
+- Changed `PAGE_SIZE = 20` to `PAGE_SIZE = 50` in `web/app.py` (line 14)
+- Total pages recalculate automatically via `(total + PAGE_SIZE - 1) // PAGE_SIZE`
+- LIMIT/OFFSET pagination unchanged — uses `PAGE_SIZE` constant correctly throughout
+- Files changed: `web/app.py`
+- **Learnings for future iterations:**
+  - `PAGE_SIZE` is a single constant controlling all pagination math — one-line change
   - Manual browser verification needed (no browser tools available in this env)
 ---
