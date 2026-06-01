@@ -98,7 +98,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -114,7 +114,7 @@
         "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -132,7 +132,7 @@
         "Verify in browser: aprire scheda sezione CAI Bergamo (cai_codice_fiscale 80004970168) tab Sottosezioni -> mostra 30 sottosezioni; aprire CAI Pisa -> mostra messaggio vuoto"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": ""
     }
   ]

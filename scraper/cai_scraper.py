@@ -109,24 +109,29 @@ def fetch_subsections(codice_sezione: str) -> list[dict]:
 
 
 def fetch_all_sections() -> list[dict]:
-    """Fetch all CAI sections from the REST API for all 20 Italian regions."""
-    results: list[dict] = []
-    with httpx.Client(timeout=30.0) as client:
-        for regione in _REGIONS:
-            logger.info("Fetching CAI sections for region: %s", regione)
-            try:
-                def _fetch(r: str = regione, c: httpx.Client = client) -> Any:
-                    resp = c.get(_SECTIONS_URL, params={"region": r})
-                    resp.raise_for_status()
-                    return resp.json()
+    """Fetch all CAI sections from the REST API.
 
-                data = _with_retry(_fetch)
-                if isinstance(data, list):
-                    for raw in data:
-                        results.append(_normalize_section(raw, regione))
-                else:
-                    logger.warning("Unexpected response type for region %s: %s", regione, type(data).__name__)
-            except Exception as exc:
-                logger.error("Failed to fetch region %s after %d retries: %s", regione, _MAX_RETRIES, exc)
+    The endpoint returns all 529 sections regardless of the ?region param,
+    so we call it once and use the 'region' field in each record.
+    """
+    _HEADERS = {"Origin": "https://www.cai.it", "Referer": "https://www.cai.it/"}
+    with httpx.Client(timeout=30.0, headers=_HEADERS) as client:
+        logger.info("Fetching all CAI sections (single request)...")
+        def _fetch(c: httpx.Client = client) -> Any:
+            resp = c.get(_SECTIONS_URL, params={"region": "lombardia"})
+            resp.raise_for_status()
+            return resp.json()
 
+        data = _with_retry(_fetch)
+
+    if not isinstance(data, list):
+        logger.error("Unexpected response type: %s", type(data).__name__)
+        return []
+
+    results = []
+    for raw in data:
+        regione = (raw.get("region") or "").upper()
+        results.append(_normalize_section(raw, regione))
+
+    logger.info("Totale sezioni recuperate: %d", len(results))
     return results
