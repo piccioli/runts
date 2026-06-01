@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Statistiche — RUNTS · Sezioni CAI{% endblock %}
 {% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 var sociRegione = {{ soci_per_regione | tojson }};
 var proventi2024Regione = {{ proventi_2024_per_regione | tojson }};
@@ -79,4 +80,45 @@ var qualitaDati = {{ qualita_dati | tojson }};
     </div>
   </div>
 </div>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Soci per regione</div>
+  <div class="card-body">
+    <canvas id="chart-soci-regione" height="300"></canvas>
+  </div>
+</div>
+
+<script>
+(function() {
+  if (!sociRegione.length) return;
+  var labels = sociRegione.map(function(r) { return r.cai_regione; });
+  var data = sociRegione.map(function(r) { return r.soci; });
+  new Chart(document.getElementById('chart-soci-regione'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: 'rgba(13,110,253,0.7)',
+        borderWidth: 0
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var r = sociRegione[ctx.dataIndex];
+              return r.soci.toLocaleString('it-IT') + ' soci — ' + r.n_sezioni + ' sezioni';
+            }
+          }
+        }
+      },
+      scales: { x: { beginAtZero: true } }
+    }
+  });
+})();
+</script>
 {% endblock %}
