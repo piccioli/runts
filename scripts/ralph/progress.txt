@@ -94,3 +94,28 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - The `shown.bs.tab` listener for replaceState and for Leaflet lazy init both fire on the same event — order matters: replaceState JS is included before Leaflet JS, so they execute in document order
   - Manual browser verification needed
 ---
+
+## 2026-06-01 - US-001 (sezioni-cai PRD)
+- Added `CREATE TABLE IF NOT EXISTS sezioni_cai` and `sottosezioni_cai` to `SCHEMA` in `scraper/db.py`
+- Added 3 indices: `idx_sezioni_cai_cf`, `idx_sezioni_cai_regione`, `idx_sottosezioni_cai_sezione`
+- Added both table DDLs and their indices to `_MIGRATIONS` list
+- Implemented `upsert_sezione_cai(conn, data)` and `upsert_sottosezione_cai(conn, data)` using `INSERT OR REPLACE`
+- Files changed: `scraper/db.py`
+- **Learnings for future iterations:**
+  - Both upsert functions follow the same pattern as `upsert_allegato`: detect existing row, return 'inserted'/'updated', use INSERT OR REPLACE
+  - `cai_scraped_at` defaults to `datetime.now()` if not provided in data dict
+  - The `_MIGRATIONS` list is idempotent: uses `IF NOT EXISTS` for tables and indices, so safe to re-run
+---
+
+## 2026-06-01 - US-002 (sezioni-cai PRD)
+- Created `scraper/cai_scraper.py` with `fetch_all_sections() -> list[dict]`
+- Iterates over 20 region slugs, calls GET `https://www.cai.it/wp-json/cai-section/v2/sections-list-simple?region=<regione>` via httpx
+- `_normalize_section(raw, regione)` maps API response fields to DB column names with `cai_` prefix; serializes `officeAddress`/`postalAddress` as `json.dumps()`
+- `_with_retry(fn)` wraps any httpx call with max 3 attempts and exponential backoff (1s, 2s delays)
+- Per-region failures are caught and logged without aborting the full fetch
+- Files changed: `scraper/cai_scraper.py` (new)
+- **Learnings for future iterations:**
+  - Use default-argument capture in nested `def _fetch(r=regione, c=client)` to correctly capture loop variables for retry closures
+  - `httpx.Client` used synchronously (not async) — matches the scraper's sync pattern; suitable since this scraper is not performance-critical
+  - API field names not known until runtime; `_normalize_section` uses fallback `or` chains (e.g. `raw.get("officePhone") or raw.get("office_phone")`) to tolerate naming variations
+---
