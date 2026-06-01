@@ -27,6 +27,12 @@
     <button type="submit" class="btn btn-primary flex-fill">Cerca</button>
     <a href="/" class="btn btn-outline-secondary">Reset</a>
   </div>
+  <div class="col-12">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="ets" value="1" id="cb-ets" {% if ets %}checked{% endif %}>
+      <label class="form-check-label" for="cb-ets">Solo sezioni ETS</label>
+    </div>
+  </div>
 </form>
 
 {# Result count + toggle + export #}
@@ -46,6 +52,7 @@
          class="btn btn-sm btn-outline-secondary">Esporta CSV</a>
       <a href="/api/enti.xlsx?q={{ q }}&regione={{ regione }}"
          class="btn btn-sm btn-outline-secondary">Esporta Excel</a>
+      {% if ets %}<span class="badge bg-success align-self-center">Filtro ETS attivo</span>{% endif %}
     </div>
   </div>
 
@@ -63,7 +70,7 @@
         </thead>
         <tbody>
           {% for e in enti %}
-          {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&page=" ~ page %}
+          {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&page=" ~ page ~ ("&ets=1" if ets else "") %}
           <tr>
             <td class="text-muted small">{{ e.codice_cai or "—" }}</td>
             <td>
@@ -88,20 +95,21 @@
     {% if total_pages > 1 %}
     <nav>
       <ul class="pagination pagination-sm">
+        {% set ets_param = "&ets=1" if ets else "" %}
         <li class="page-item {% if page == 1 %}disabled{% endif %}">
-          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page - 1 }}">‹</a>
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page - 1 }}{{ ets_param }}">‹</a>
         </li>
         {% for p in range(1, total_pages + 1) %}
           {% if p == page or (p >= page - 2 and p <= page + 2) or p == 1 or p == total_pages %}
             <li class="page-item {% if p == page %}active{% endif %}">
-              <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ p }}">{{ p }}</a>
+              <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ p }}{{ ets_param }}">{{ p }}</a>
             </li>
           {% elif p == page - 3 or p == page + 3 %}
             <li class="page-item disabled"><span class="page-link">…</span></li>
           {% endif %}
         {% endfor %}
         <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page + 1 }}">›</a>
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page + 1 }}{{ ets_param }}">›</a>
         </li>
       </ul>
     </nav>

@@ -136,12 +136,13 @@ async def enti_list(
     q: Optional[str] = None,
     regione: Optional[str] = None,
     sezione_registro: Optional[str] = None,
+    ets: Optional[int] = None,
     page: int = 1,
 ):
     if not _db_exists():
         return _tr(request, "list.html", {
             "enti": [], "total": 0, "page": 1, "total_pages": 0,
-            "q": "", "regione": "", "regioni": [],
+            "q": "", "regione": "", "regioni": [], "ets": 0,
         })
 
     conn = get_db()
@@ -149,10 +150,12 @@ async def enti_list(
         if not _table_exists(conn, "sezioni_cai"):
             return _tr(request, "list.html", {
                 "enti": [], "total": 0, "page": 1, "total_pages": 0,
-                "q": q or "", "regione": regione or "", "regioni": [],
+                "q": q or "", "regione": regione or "", "regioni": [], "ets": 0,
             })
 
         clauses, params = _build_cai_filter_clauses(q, regione)
+        if ets:
+            clauses.append("s.cai_codice_fiscale IS NOT NULL AND e.id_runts IS NOT NULL")
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
         total = conn.execute(
@@ -189,6 +192,7 @@ async def enti_list(
         "q": q or "",
         "regione": regione or "",
         "regioni": regioni,
+        "ets": 1 if ets else 0,
     })
 
 
