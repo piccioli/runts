@@ -19,3 +19,17 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - FastAPI query params can be read via `request.query_params.get()` without declaring them in the function signature
   - The template context dict is the third positional arg to `_tr()`
 ---
+
+## 2026-06-01 - US-002
+- Restructured `web/templates/detail.html` to add Bootstrap 5 nav-tabs skeleton
+- Moved "Scarica scheda PDF" and "Vedi su RUNTS" buttons from card-footer to card-header (dark bg → btn-outline-light)
+- Added `<ul class="nav nav-tabs">` with 4 `<li>` items (principale, bilanci, allegati, mappa); active class set via Jinja2 `active_tab`
+- Added `<div class="tab-content">` with 4 tab panes; principale pane contains the dl fields (moved from card-body); other panes are empty (content moves in US-003–006)
+- Existing bilanci, allegati, cariche, mappa sections remain as separate cards below the main card (intermediate state)
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - base.html includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — tab switching uses plain `<a href="?tab=...">` links (server-side) rather than data-bs-toggle; US-007 will add JS for client-side URL updates
+  - Bootstrap 5 `tab-pane` uses `show active` classes to display the active pane — these must be set server-side via Jinja2 when not using BS5 JS
+  - Custom Jinja2 filters (human_size, format_euro, mask_cf) are registered in web/app.py at startup — testing template syntax standalone will fail on these filters
+  - Manual browser verification needed (no browser tools available in this env)
+---
