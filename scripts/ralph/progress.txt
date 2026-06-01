@@ -119,3 +119,15 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - `httpx.Client` used synchronously (not async) — matches the scraper's sync pattern; suitable since this scraper is not performance-critical
   - API field names not known until runtime; `_normalize_section` uses fallback `or` chains (e.g. `raw.get("officePhone") or raw.get("office_phone")`) to tolerate naming variations
 ---
+
+## 2026-06-01 - US-003 (sezioni-cai PRD)
+- Added `_SUBSECTIONS_URL` constant with `{code}` placeholder in `scraper/cai_scraper.py`
+- Added `_normalize_subsection(raw, codice_sezione)` mapping API fields to sottosezioni_cai columns
+- Added `fetch_subsections(codice_sezione: str) -> list[dict]` with retry, 404 tolerance, and empty-response guard
+- Header `Origin: https://www.cai.it` sent on every request as required by the API
+- Files changed: `scraper/cai_scraper.py`
+- **Learnings for future iterations:**
+  - 404 must be checked BEFORE `raise_for_status()` since httpx would raise on 4xx; check `resp.status_code == 404` first and return `[]`
+  - Wrapping the `httpx.Client` context manager inside the retry-called lambda works cleanly — client is created per `fetch_subsections()` call
+  - Same `_with_retry` helper reused; all exceptions (including httpx errors after max retries) are caught at the outer level and return `[]`
+---
