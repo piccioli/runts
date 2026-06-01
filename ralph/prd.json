@@ -47,7 +47,7 @@
         "Verify in browser: aprire /ente/83894 e verificare che tutti i campi anagrafici di CAI Pisa siano visibili nel pannello 'Dati principali'"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
