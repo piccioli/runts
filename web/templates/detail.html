@@ -13,57 +13,88 @@
 </div>
 
 <div class="card shadow-sm">
-  <div class="card-header bg-dark text-white">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
     <h1 class="h5 mb-0">{{ ente.denominazione }}</h1>
+    <div class="d-flex gap-2">
+      <a href="/ente/{{ ente.id_runts }}/pdf" class="btn btn-sm btn-outline-light">
+        Scarica scheda PDF
+      </a>
+      {% if ente.url_dettaglio %}
+      <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">
+        Vedi su RUNTS ↗
+      </a>
+      {% endif %}
+    </div>
   </div>
-  <div class="card-body">
-    <dl class="row mb-0">
 
-      {% set labels = {
-        "codice_fiscale": "Codice fiscale",
-        "forma_giuridica": "Forma giuridica",
-        "natura_giuridica": "Natura giuridica",
-        "sezione_registro": "Sezione del registro",
-        "data_iscrizione": "Data iscrizione",
-        "sede_stato": "Stato",
-        "sede_indirizzo": "Indirizzo",
-        "sede_civico": "Civico",
-        "sede_comune": "Comune",
-        "sede_provincia": "Provincia",
-        "sede_regione": "Regione",
-        "sede_cap": "CAP",
-        "rappresentante_legale": "Rappresentante legale",
-        "pec": "PEC",
-        "sito_web": "Sito web",
-        "settori_attivita": "Settori di attività"
-      } %}
+  <ul class="nav nav-tabs px-3 mb-0" id="enteTabs">
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'principale' %}active{% endif %}" href="?tab=principale">Dati principali</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'bilanci' %}active{% endif %}" href="?tab=bilanci">Indicatori di bilancio</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'allegati' %}active{% endif %}" href="?tab=allegati">Atti e documenti</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'mappa' %}active{% endif %}" href="?tab=mappa">Mappa</a>
+    </li>
+  </ul>
 
-      {% for key, label in labels.items() %}
-        {% if fields.get(key) %}
-        <dt class="col-sm-4 col-md-3 text-muted small">{{ label }}</dt>
-        <dd class="col-sm-8 col-md-9">
-          {% if key == "pec" %}
-            <a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
-          {% elif key == "sito_web" %}
-            <a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
-          {% else %}
-            {{ fields[key] }}
+  <div class="tab-content" id="enteTabContent">
+    <div class="tab-pane {% if active_tab == 'principale' %}show active{% endif %} p-3"
+         id="principale">
+      <dl class="row mb-0">
+
+        {% set labels = {
+          "codice_fiscale": "Codice fiscale",
+          "forma_giuridica": "Forma giuridica",
+          "natura_giuridica": "Natura giuridica",
+          "sezione_registro": "Sezione del registro",
+          "data_iscrizione": "Data iscrizione",
+          "sede_stato": "Stato",
+          "sede_indirizzo": "Indirizzo",
+          "sede_civico": "Civico",
+          "sede_comune": "Comune",
+          "sede_provincia": "Provincia",
+          "sede_regione": "Regione",
+          "sede_cap": "CAP",
+          "rappresentante_legale": "Rappresentante legale",
+          "pec": "PEC",
+          "sito_web": "Sito web",
+          "settori_attivita": "Settori di attività"
+        } %}
+
+        {% for key, label in labels.items() %}
+          {% if fields.get(key) %}
+          <dt class="col-sm-4 col-md-3 text-muted small">{{ label }}</dt>
+          <dd class="col-sm-8 col-md-9">
+            {% if key == "pec" %}
+              <a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
+            {% elif key == "sito_web" %}
+              <a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
+            {% else %}
+              {{ fields[key] }}
+            {% endif %}
+          </dd>
           {% endif %}
-        </dd>
-        {% endif %}
-      {% endfor %}
+        {% endfor %}
 
-    </dl>
-  </div>
-  <div class="card-footer d-flex justify-content-end gap-2">
-    <a href="/ente/{{ ente.id_runts }}/pdf" class="btn btn-sm btn-outline-secondary">
-      Scarica scheda PDF
-    </a>
-    {% if ente.url_dettaglio %}
-    <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
-      Vedi su RUNTS ↗
-    </a>
-    {% endif %}
+      </dl>
+    </div>
+
+    <div class="tab-pane {% if active_tab == 'bilanci' %}show active{% endif %}"
+         id="bilanci">
+    </div>
+
+    <div class="tab-pane {% if active_tab == 'allegati' %}show active{% endif %}"
+         id="allegati">
+    </div>
+
+    <div class="tab-pane {% if active_tab == 'mappa' %}show active{% endif %}"
+         id="mappa">
+    </div>
   </div>
 </div>
 
