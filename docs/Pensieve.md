@@ -1,26 +1,11 @@
 # Pensieve — RUNTS-CAI
 
-> Brain dump del progetto. Le idee nascono qui in IDEAS, scendono in TODO quando voglio includerle in un rilascio, e finiscono in DONE dopo il rilascio.
-
-## Workflow
-
-1. **IDEAS** — Aggiungo qui qualsiasi spunto, anche grezzo. Linguaggio naturale, una idea per voce, con tag d'area tra parentesi quadre per filtrarle a colpo d'occhio: `[web]`, `[scraper]`, `[db]`, `[geo]`, `[deploy]`, `[ux]`, `[data]`, `[devx]`.
-2. **TODO** — Quando preparo un nuovo rilascio sposto qui (manualmente) le idee che entrano nello scope. Aggiungo eventualmente note sul perché ho scelto quelle.
-3. **Specifiche** — Da TODO chiedo a Claude di redigere `docs/releases/cairunts_<N>.md`. Lo modifico a mano (aggiungendo screenshot, mockup, dettagli). Quando è pronto, chiedo a Claude di generare il PDF in carta intestata in `docs/PDF/`.
-4. **OpenSpec** — Il file `.md` di release è il materiale di input per il change OpenSpec che ClaudeCode userà per implementare.
-5. **DONE** — Dopo il rilascio sposto qui le voci, con il numero di release e un mini-commento.
-
-### Naming convention release
-
-- File specifica: `docs/releases/cairunts_<release_num>.md` — es. `cairunts_001.md`, `cairunts_002.md`. Usare zero-padding a tre cifre per ordinamento naturale.
-- PDF: `docs/PDF/cairunts_<release_num>_v<x.y>_<YYYY-MM-DD>.pdf` — es. `cairunts_001_v1.0_2026-05-23.pdf`.
-- In testa al file `.md` un blocco di metadati: titolo, numero release, data, stato (`draft` / `proposed` / `approved`), elenco capability OpenSpec impattate.
-
----
 
 ## IDEAS
 
 ### Web app & UX
+
+
 - `[web][ux]` **Vista statistiche** (`/stats`) con grafici aggregati: enti per regione, per sezione di registro, distribuzione temporale per data di iscrizione. Chart.js via CDN.
 - `[web][ux]` **Filtri multipli**: selezione multipla di regioni/sezioni invece del singolo dropdown.
 - `[web][ux]` **Ricerca full-text** con SQLite FTS5 su denominazione + comune + indirizzo, per trovare un ente anche con typo o frammenti.
@@ -63,13 +48,21 @@
 
 ## TODO
 
-- `[scraper]` **Aggiungere lo scraping dei dati provenienti dal CAI** Partendo da https://www.cai.it/sezioni-territoriali/sezioni-e-sottosezioni/ recuperare tutte le informazioni che riguardano le Sezioni (compreso codice Sezione e informazioni che riguardano le sottosezioni)
-- `[web][ux]` **Cambiare contenuto lista Sezioni** La lsita delle sezioni deve arrivare dalla tabella "sezioni CAI"
-- `[web][ux]` **Cambiare contenuto lista Sezioni** Filtro Mostra solo Sezioni ETS
+- `[web][ux]` **Fissare header** Header fisso allo scroll 
+- `[web][ux]` **Aggiungere footer** Aggiungere footer fisso in fondo con informazioni su Montagna Servizi SCPA
+- `[web][ux]` **Menu** Aggiungere menu con le seguenti voci: Sezioni, Gruppi Regionali, Statistiche, ETS  
+- `[web][ux]` **Risultati su lista a 50** nelle pagine che prevedono liste di risultati portare a 50 gli elementi visualizzati
+- `[web][ux]` **Sanitiy check filter** Aggiungere un filtro in Sezioni che mostra le sezioni che hanno qualche problema sui dati 
+- `[web][ux]` **Menu ETS** Mostra tutti gli elementi ETS scaricati con lo scraper, in particolare quelli che non hanno elementi associati
+- `[web][ux]` **Menu Regioni** Nuovo elementi scraper da dati CAI https://www.cai.it/organizzazione/gruppi-regionali-e-provinciali/ da associare agli elementi mancanti ETS che riguardano la regione
 
 ---
 
 ## DONE
+
+- `[scraper]` **Aggiungere lo scraping dei dati provenienti dal CAI** Partendo da https://www.cai.it/sezioni-territoriali/sezioni-e-sottosezioni/ recuperare tutte le informazioni che riguardano le Sezioni (compreso codice Sezione e informazioni che riguardano le sottosezioni)
+- `[web][ux]` **Cambiare contenuto lista Sezioni** La lsita delle sezioni deve arrivare dalla tabella "sezioni CAI"
+- `[web][ux]` **Cambiare contenuto lista Sezioni** Filtro Mostra solo Sezioni ETS
 
 REV 002:
 - `[scraper]` **Documenti allegati** Scaricare i documenti allegati alle pagine RUNTS asociandoli ai rispettivi enti 

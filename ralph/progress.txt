@@ -1,0 +1,144 @@
+## 2026-06-01 - US-011
+- Added route GET `/stats` to `web/app.py`: iterates `["sezioni_cai", "enti", "allegati", "bilanci"]`, uses `_table_exists()` guard before COUNT(*), passes `counts` dict + `active_page='stats'`
+- Created `web/templates/stats.html`: title "Statistiche", subtitle "In costruzione", 4 Bootstrap cards in a responsive row grid (col-sm-6 col-lg-3) with colored display-6 numbers
+- Files changed: `web/app.py`, `web/templates/stats.html` (new)
+- **Learnings for future iterations:**
+  - Iterating over a list of table names and using `f"SELECT COUNT(*) FROM {table}"` avoids repeating boilerplate; `_table_exists()` guard makes it safe for empty DBs
+  - `counts` dict is passed as a single Jinja2 var and accessed as `counts.sezioni_cai` etc.
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-010
+- Added route GET `/gruppi-regionali` to `web/app.py`: SELECT with `json_extract(gr_indirizzo_sede, '$.province')` + LEFT JOIN enti; `active_page='gruppi-regionali'`
+- Created `web/templates/gruppi_regionali.html` with 6-column table (Nome GR, Provincia, Email, Telefono, Sito web, Ente RUNTS)
+- Rows with `gr_id_runts IS NULL` have `class="table-warning"`; badge `bg-warning text-dark` for non-agganciati
+- Empty-table message with `python3 -m scraper.cai_main` instruction
+- Files changed: `web/app.py`, `web/templates/gruppi_regionali.html` (new)
+- **Learnings for future iterations:**
+  - Province extracted via `json_extract(g.gr_indirizzo_sede, '$.province')` in SQL — consistent with `json_extract(s.cai_indirizzo_sede, '$.city')` pattern in sections list
+  - `empty_ctx` dict defined at top of route avoids repeating the dict in multiple early-return branches
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-009
+- Added `--no-groups` flag to `scraper/cai_main.py` argparse (default: GR fetch is enabled)
+- Added `_norm_name(s)` helper: lowercase, strip accents (NFD/Mn), remove non-alphanumeric, collapse whitespace
+- Added `_match_gr_to_enti(conn, gr)`: (1) exact CF match via SQL, (2) fuzzy SequenceMatcher ratio >= 0.5 over all enti.denominazione
+- GR block: fetch → match → set gr_id_runts → upsert; tracks scaricati/inseriti/aggiornati/agganciati
+- Report section printed only when `--no-groups` is not set
+- Files changed: `scraper/cai_main.py`
+- **Learnings for future iterations:**
+  - `difflib.SequenceMatcher(None, a, b).ratio()` is the standard fuzzy match; threshold 0.5 is permissive for short names
+  - Fuzzy match scans ALL enti rows (N=226 max) — acceptable for this scale, no index needed
+  - CF exact match takes priority; fuzzy only runs when `gr_codice_fiscale` is None
+  - `_norm_name` uses `unicodedata.normalize("NFD")` + Mn category filter for accent stripping (pure stdlib)
+---
+
+## 2026-06-01 - US-008
+- Added `fetch_regional_groups() -> list[dict]` to `scraper/cai_scraper.py`
+- Calls GET `https://www.cai.it/wp-json/cai-section/v2/regional-groups-list` with Origin/Referer headers
+- Normalizes API fields to `gr_` prefixed column names; serializes officeAddress/postalAddress as json.dumps()
+- Uses existing `_with_retry()` for max 3 retries with exponential backoff
+- Files changed: `scraper/cai_scraper.py`
+- **Learnings for future iterations:**
+  - Added `_REGIONAL_GROUPS_URL` constant alongside existing URL constants
+  - Pattern is identical to `fetch_all_sections()`: client with headers, `_with_retry()`, isinstance check, list comprehension
+  - `gr_id_runts` is NOT set here — it's populated by the matching logic in cai_main.py (US-009)
+---
+
+## 2026-06-01 - US-007
+- Added `CREATE TABLE IF NOT EXISTS gruppi_regionali_cai` to SCHEMA in `scraper/db.py` with 16 columns (gr_codice PRIMARY KEY + 15 fields)
+- Added `CREATE INDEX IF NOT EXISTS idx_gr_cai_cf ON gruppi_regionali_cai(gr_codice_fiscale)` to SCHEMA
+- Added migration entries to `_MIGRATIONS` for both the table DDL and the index
+- Implemented `upsert_gruppo_regionale(conn, data)` following the same INSERT OR REPLACE pattern as `upsert_sezione_cai()`
+- Files changed: `scraper/db.py`
+- **Learnings for future iterations:**
+  - New tables follow the pattern: add DDL to SCHEMA (for fresh DBs) + add same DDL to _MIGRATIONS (for existing DBs) + add index to both
+  - `upsert_gruppo_regionale` auto-sets `gr_scraped_at` to now if not provided (same as `cai_scraped_at` pattern)
+  - `gr_id_runts` is nullable — it gets populated by cai_main.py matching logic (US-009)
+---
+
+## Codebase Patterns
+- Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
+- FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
+- No mypy installed in the venv; typecheck = syntax OK + pytest passing
+- `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
+- SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
+- `base.html` includes Bootstrap 5 CSS and (since US-003) Bootstrap 5 JS bundle — no need to add it in individual templates
+- The `active_page` context var is used in base.html for nav-link active states (set by each route in app.py)
+
+# Ralph Progress Log
+Started: Lun  1 Giu 2026
+---
+
+## 2026-06-01 - US-001
+- Added `sticky-top` class to `<nav class="navbar">` in `web/templates/base.html`
+- Header now stays visible during scroll on all pages
+- Files changed: `web/templates/base.html`
+- **Learnings for future iterations:**
+  - Bootstrap 5 `sticky-top` on the `<nav>` element is sufficient — no CSS override needed
+  - The container already has `pb-5` so content isn't hidden behind anything at the bottom
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-002
+- Added `<footer class="footer fixed-bottom bg-dark text-white py-2">` to `web/templates/base.html`
+- Footer shows 'Montagna Servizi S.C.P.A. — Via Errico Petrella 19, 20124 Milano — montagnaservizi.com'
+- Container already had `pb-5` so no additional padding needed
+- Files changed: `web/templates/base.html`
+- **Learnings for future iterations:**
+  - `fixed-bottom` footer is inside the `<body>` but outside the `.container` — place it after the closing `</div>` of the main container
+  - Bootstrap `pb-5` (3rem) is enough clearance for a `py-2` footer (~2.5rem tall)
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-003
+- Added 4 nav-link items to navbar in `web/templates/base.html`: Sezioni (/), Gruppi Regionali (/gruppi-regionali), ETS (/ets), Statistiche (/stats)
+- Active state uses `{% if active_page == '...' %}active{% endif %}` Jinja2 conditionals
+- Made navbar collapsible on mobile with `navbar-expand-lg` + `navbar-toggler` button + `collapse navbar-collapse` div
+- Added Bootstrap 5 JS bundle to base.html (required for the toggler; was previously absent)
+- Updated all 3 `_tr()` calls in the `/` route to pass `active_page='sezioni'`
+- Files changed: `web/templates/base.html`, `web/app.py`
+- **Learnings for future iterations:**
+  - Bootstrap JS must now be in base.html (added here for the toggler) — no need to add it in individual templates
+  - Future routes (/ets, /gruppi-regionali, /stats) must pass `active_page` matching their menu key
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-004
+- Changed `PAGE_SIZE = 20` to `PAGE_SIZE = 50` in `web/app.py` (line 14)
+- Total pages recalculate automatically via `(total + PAGE_SIZE - 1) // PAGE_SIZE`
+- LIMIT/OFFSET pagination unchanged — uses `PAGE_SIZE` constant correctly throughout
+- Files changed: `web/app.py`
+- **Learnings for future iterations:**
+  - `PAGE_SIZE` is a single constant controlling all pagination math — one-line change
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-005
+- Added `issues: Optional[int] = None` parameter to `enti_list` route in `web/app.py`
+- When `issues=1`, appends a single OR-compound clause to the WHERE conditions covering: fuzzy_nome match note, cf_mismatch% match note, missing lat/lon, no bilanci record, no allegati record
+- Also added `issues: 0` to the early-return contexts (no DB, no table)
+- Added "Solo problemi dati" checkbox (name=issues value=1) next to the ETS checkbox in `web/templates/list.html`
+- Propagated `issues_param` into back_url set variable and all pagination `<a>` hrefs
+- Added "Filtro problemi attivo" badge in the results header when issues=1
+- Files changed: `web/app.py`, `web/templates/list.html`
+- **Learnings for future iterations:**
+  - The issues clause uses no bound parameters (all literals) — just append the string to `clauses`, no `params` extension needed
+  - `e.lat IS NULL OR e.lon IS NULL` will match all sezioni_cai with no LEFT JOIN match in enti (expected per PRD spec)
+  - Both `ets_param` and `issues_param` are needed as separate Jinja2 variables in the pagination block
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-006
+- Added route GET /ets in `web/app.py`: SELECT enti LEFT JOIN sezioni_cai ON codice_fiscale=cai_codice_fiscale, ordered non-agganciati first
+- Created `web/templates/ets.html` with table (Denominazione, Comune, Regione, Codice CAI, Status) and counter
+- Status badges: bg-success 'Agganciato' (exact match), bg-warning 'CF mancante CAI' (fuzzy_nome), bg-danger 'CF discordante' (cf_mismatch%), bg-warning text-dark 'Non agganciato' (NULL codice_cai)
+- Counter computed dynamically from query results (no hardcoded 226)
+- Files changed: `web/app.py`, `web/templates/ets.html`
+- **Learnings for future iterations:**
+  - `_table_exists()` guard needed for both `enti` and `sezioni_cai` before the JOIN query
+  - Jinja2 supports `.startswith()` on string values from sqlite3.Row — use `e.cai_match_note and e.cai_match_note.startswith('...')` to guard None
+  - Counter can be derived from `len()` and `sum()` over the already-fetched list rather than a separate COUNT query
+  - Manual browser verification needed (no browser tools available in this env)
+---

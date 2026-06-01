@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}ETS — RUNTS · Sezioni CAI{% endblock %}
+{% block content %}
+<h1 class="h3 mb-1">Enti ETS</h1>
+<p class="text-muted mb-3">{{ total }} enti ETS — {{ agganciati }} agganciati, {{ non_agganciati }} non agganciati</p>
+
+{% if enti %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>Denominazione</th>
+        <th>Comune</th>
+        <th>Regione</th>
+        <th>CF RUNTS</th>
+        <th>Codice CAI</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in enti %}
+      <tr>
+        <td><a href="/sezione/{% if e.codice_cai %}{{ e.codice_cai }}{% else %}{{ e.id_runts }}{% endif %}">{{ e.denominazione }}</a></td>
+        <td>{{ e.sede_comune or '—' }}</td>
+        <td>{{ e.sede_regione or '—' }}</td>
+        <td class="text-muted small font-monospace">{{ e.codice_fiscale or '—' }}</td>
+        <td>{{ e.codice_cai or '—' }}</td>
+        <td>
+          {% if e.codice_cai is none %}
+            <span class="badge bg-warning text-dark">Non agganciato</span>
+          {% elif e.cai_match_note == 'fuzzy_nome' %}
+            <span class="badge bg-warning">CF mancante CAI</span>
+          {% elif e.cai_match_note and e.cai_match_note.startswith('cf_mismatch') %}
+            <span class="badge bg-danger">CF discordante</span>
+          {% else %}
+            <span class="badge bg-success">Agganciato</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">Nessun dato disponibile.</p>
+{% endif %}
+{% endblock %}

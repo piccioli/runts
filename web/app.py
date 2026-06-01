@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 DB_PATH = os.environ.get("DB_PATH", "/app/runts.db")
-PAGE_SIZE = 20
+PAGE_SIZE = 50
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "static")), name="static")
@@ -137,12 +137,14 @@ async def enti_list(
     regione: Optional[str] = None,
     sezione_registro: Optional[str] = None,
     ets: Optional[int] = None,
+    issues: Optional[int] = None,
     page: int = 1,
 ):
     if not _db_exists():
         return _tr(request, "list.html", {
             "enti": [], "total": 0, "page": 1, "total_pages": 0,
-            "q": "", "regione": "", "regioni": [], "ets": 0,
+            "q": "", "regione": "", "regioni": [], "ets": 0, "issues": 0,
+            "active_page": "sezioni",
         })
 
     conn = get_db()
@@ -150,12 +152,21 @@ async def enti_list(
         if not _table_exists(conn, "sezioni_cai"):
             return _tr(request, "list.html", {
                 "enti": [], "total": 0, "page": 1, "total_pages": 0,
-                "q": q or "", "regione": regione or "", "regioni": [], "ets": 0,
+                "q": q or "", "regione": regione or "", "regioni": [], "ets": 0, "issues": 0,
+                "active_page": "sezioni",
             })
 
         clauses, params = _build_cai_filter_clauses(q, regione)
         if ets:
             clauses.append("s.cai_codice_fiscale IS NOT NULL AND e.id_runts IS NOT NULL")
+        if issues:
+            clauses.append(
+                "(s.cai_match_note = 'fuzzy_nome'"
+                " OR s.cai_match_note LIKE 'cf_mismatch%'"
+                " OR e.lat IS NULL OR e.lon IS NULL"
+                " OR (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bilanci b WHERE b.id_runts = e.id_runts))"
+                " OR (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM allegati a WHERE a.id_runts = e.id_runts)))"
+            )
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
         total = conn.execute(
@@ -193,68 +204,291 @@ async def enti_list(
         "regione": regione or "",
         "regioni": regioni,
         "ets": 1 if ets else 0,
+        "issues": 1 if issues else 0,
+        "active_page": "sezioni",
     })
 
 
 _VALID_TABS = {"principale", "bilanci", "allegati", "mappa", "sottosezioni"}
 
 
-@app.get("/ente/{id_runts}", response_class=HTMLResponse)
-async def ente_detail(request: Request, id_runts: str, back: Optional[str] = None):
+@app.get("/ets", response_class=HTMLResponse)
+async def ets_list(request: Request):
     if not _db_exists():
-        return _tr(request, "404.html", status_code=404)
-
-    tab = request.query_params.get("tab", "principale")
-    active_tab = tab if tab in _VALID_TABS else "principale"
+        return _tr(request, "ets.html", {
+            "enti": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+            "active_page": "ets",
+        })
 
     conn = get_db()
     try:
-        row = conn.execute("SELECT * FROM enti WHERE id_runts = ?", (id_runts,)).fetchone()
-        if row is None:
+        if not _table_exists(conn, "enti") or not _table_exists(conn, "sezioni_cai"):
+            return _tr(request, "ets.html", {
+                "enti": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+                "active_page": "ets",
+            })
+
+        enti = conn.execute(
+            "SELECT e.id_runts, e.denominazione, e.sede_comune, e.sede_regione, "
+            "e.codice_fiscale, s.codice_cai, s.cai_match_note "
+            "FROM enti e "
+            "LEFT JOIN sezioni_cai s ON e.codice_fiscale = s.cai_codice_fiscale "
+            "ORDER BY (CASE WHEN s.codice_cai IS NULL THEN 0 ELSE 1 END), e.denominazione"
+        ).fetchall()
+
+        total = len(enti)
+        agganciati = sum(1 for r in enti if r["codice_cai"] is not None)
+        non_agganciati = total - agganciati
+    finally:
+        conn.close()
+
+    return _tr(request, "ets.html", {
+        "enti": enti,
+        "total": total,
+        "agganciati": agganciati,
+        "non_agganciati": non_agganciati,
+        "active_page": "ets",
+    })
+
+
+@app.get("/gruppi-regionali", response_class=HTMLResponse)
+async def gruppi_regionali(request: Request):
+    empty_ctx = {
+        "gruppi": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+        "active_page": "gruppi-regionali",
+    }
+    if not _db_exists():
+        return _tr(request, "gruppi_regionali.html", empty_ctx)
+
+    conn = get_db()
+    try:
+        if not _table_exists(conn, "gruppi_regionali_cai"):
+            return _tr(request, "gruppi_regionali.html", empty_ctx)
+
+        gruppi = conn.execute(
+            "SELECT g.gr_codice, g.gr_nome, "
+            "json_extract(g.gr_indirizzo_sede, '$.province') AS provincia, "
+            "g.gr_email, g.gr_telefono, g.gr_sito_web, g.gr_id_runts, "
+            "e.denominazione AS ente_denominazione "
+            "FROM gruppi_regionali_cai g "
+            "LEFT JOIN enti e ON g.gr_id_runts = e.id_runts "
+            "ORDER BY g.gr_nome"
+        ).fetchall()
+
+        total = len(gruppi)
+        agganciati = sum(1 for r in gruppi if r["gr_id_runts"] is not None)
+        non_agganciati = total - agganciati
+    finally:
+        conn.close()
+
+    return _tr(request, "gruppi_regionali.html", {
+        "gruppi": gruppi,
+        "total": total,
+        "agganciati": agganciati,
+        "non_agganciati": non_agganciati,
+        "active_page": "gruppi-regionali",
+    })
+
+
+@app.get("/gr/{gr_codice}", response_class=HTMLResponse)
+async def gr_detail(request: Request, gr_codice: str, back: Optional[str] = None):
+    import json as _json
+    if not _db_exists():
+        return _tr(request, "404.html", status_code=404)
+
+    conn = get_db()
+    try:
+        gr_row = conn.execute(
+            "SELECT * FROM gruppi_regionali_cai WHERE gr_codice = ?", (gr_codice,)
+        ).fetchone() if _table_exists(conn, "gruppi_regionali_cai") else None
+        if gr_row is None:
             return _tr(request, "404.html", status_code=404)
+
+        ente_row = conn.execute(
+            "SELECT * FROM enti WHERE id_runts = ?", (gr_row["gr_id_runts"],)
+        ).fetchone() if gr_row["gr_id_runts"] and _table_exists(conn, "enti") else None
+
+        allegati = conn.execute(
+            "SELECT * FROM allegati WHERE id_runts = ? ORDER BY codice_pratica, anno",
+            (gr_row["gr_id_runts"],),
+        ).fetchall() if gr_row["gr_id_runts"] and _table_exists(conn, "allegati") else []
+
+        bilanci = conn.execute(
+            "SELECT * FROM bilanci WHERE id_runts = ? ORDER BY anno DESC",
+            (gr_row["gr_id_runts"],),
+        ).fetchall() if gr_row["gr_id_runts"] and _table_exists(conn, "bilanci") else []
+
+        cariche = conn.execute(
+            "SELECT * FROM cariche_sociali WHERE id_runts = ? "
+            "ORDER BY (valid_to IS NULL) DESC, ruolo, cognome",
+            (gr_row["gr_id_runts"],),
+        ).fetchall() if gr_row["gr_id_runts"] and _table_exists(conn, "cariche_sociali") else []
+    finally:
+        conn.close()
+
+    gr = dict(gr_row)
+    raw_addr = gr.get("gr_indirizzo_sede")
+    gr["gr_indirizzo_sede_parsed"] = _json.loads(raw_addr) if raw_addr else None
+
+    tab = request.query_params.get("tab", "gr")
+    valid = {"gr", "ets", "bilanci", "allegati", "mappa"}
+    active_tab = tab if tab in valid else "gr"
+    if active_tab == "ets" and not ente_row:
+        active_tab = "gr"
+
+    lat = ente_row["lat"] if ente_row and ente_row["lat"] else None
+    lon = ente_row["lon"] if ente_row and ente_row["lon"] else None
+
+    fields = {}
+    if ente_row:
+        fields = {k: ente_row[k] for k in ente_row.keys()
+                  if ente_row[k] is not None and k not in ("id_runts", "raw_json", "updated_at")}
+
+    return _tr(request, "gr_detail.html", {
+        "gr": gr,
+        "ente": ente_row,
+        "fields": fields,
+        "back": back or "/gruppi-regionali",
+        "allegati": allegati,
+        "bilanci": bilanci,
+        "cariche": cariche,
+        "lat": lat,
+        "lon": lon,
+        "active_tab": active_tab,
+        "active_page": "gruppi-regionali",
+    })
+
+
+@app.get("/stats", response_class=HTMLResponse)
+async def stats(request: Request):
+    counts = {"sezioni_cai": 0, "enti": 0, "allegati": 0, "bilanci": 0}
+    if _db_exists():
+        conn = get_db()
+        try:
+            for table in counts:
+                if _table_exists(conn, table):
+                    counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        finally:
+            conn.close()
+    return _tr(request, "stats.html", {"counts": counts, "active_page": "stats"})
+
+
+@app.get("/ente/{id_runts}", response_class=HTMLResponse)
+async def ente_redirect(request: Request, id_runts: str):
+    """Redirect legacy /ente/<id_runts> to unified /sezione/<id>."""
+    from fastapi.responses import RedirectResponse
+    if not _db_exists():
+        return _tr(request, "404.html", status_code=404)
+    conn = get_db()
+    try:
+        sc = conn.execute(
+            "SELECT codice_cai FROM sezioni_cai s "
+            "JOIN enti e ON e.codice_fiscale = s.cai_codice_fiscale "
+            "WHERE e.id_runts = ?", (id_runts,)
+        ).fetchone() if _table_exists(conn, "sezioni_cai") else None
+    finally:
+        conn.close()
+    target_id = sc["codice_cai"] if sc else id_runts
+    qs = str(request.url.query)
+    dest = f"/sezione/{target_id}" + (f"?{qs}" if qs else "")
+    return RedirectResponse(dest, status_code=301)
+
+
+@app.get("/sezione/{sezione_id}", response_class=HTMLResponse)
+async def sezione_detail(request: Request, sezione_id: str, back: Optional[str] = None):
+    """Unified section detail: accepts either codice_cai or id_runts."""
+    import json as _json
+    if not _db_exists():
+        return _tr(request, "404.html", status_code=404)
+
+    tab = request.query_params.get("tab", "cai")
+    conn = get_db()
+    try:
+        # 1. Try sezioni_cai by codice_cai
+        sc_row = conn.execute(
+            "SELECT * FROM sezioni_cai WHERE codice_cai = ?", (sezione_id,)
+        ).fetchone() if _table_exists(conn, "sezioni_cai") else None
+
+        # 2. Fallback: try enti by id_runts, then join sezioni_cai
+        ente_row = None
+        if sc_row is None:
+            ente_row = conn.execute(
+                "SELECT * FROM enti WHERE id_runts = ?", (sezione_id,)
+            ).fetchone() if _table_exists(conn, "enti") else None
+            if ente_row is None:
+                return _tr(request, "404.html", status_code=404)
+            sc_row = conn.execute(
+                "SELECT * FROM sezioni_cai WHERE cai_codice_fiscale = ?",
+                (ente_row["codice_fiscale"],),
+            ).fetchone() if _table_exists(conn, "sezioni_cai") and ente_row["codice_fiscale"] else None
+        else:
+            # Found by codice_cai — also try to load the RUNTS ente
+            ente_row = conn.execute(
+                "SELECT * FROM enti WHERE codice_fiscale = ?",
+                (sc_row["cai_codice_fiscale"],),
+            ).fetchone() if sc_row["cai_codice_fiscale"] and _table_exists(conn, "enti") else None
+
+        id_runts = ente_row["id_runts"] if ente_row else None
+        codice_cai = sc_row["codice_cai"] if sc_row else None
 
         allegati = conn.execute(
             "SELECT * FROM allegati WHERE id_runts = ? ORDER BY codice_pratica, anno",
             (id_runts,),
-        ).fetchall() if _table_exists(conn, "allegati") else []
+        ).fetchall() if id_runts and _table_exists(conn, "allegati") else []
 
         bilanci = conn.execute(
             "SELECT * FROM bilanci WHERE id_runts = ? ORDER BY anno DESC",
             (id_runts,),
-        ).fetchall() if _table_exists(conn, "bilanci") else []
+        ).fetchall() if id_runts and _table_exists(conn, "bilanci") else []
 
         cariche = conn.execute(
             "SELECT * FROM cariche_sociali WHERE id_runts = ? "
             "ORDER BY (valid_to IS NULL) DESC, ruolo, cognome",
             (id_runts,),
-        ).fetchall() if _table_exists(conn, "cariche_sociali") else []
+        ).fetchall() if id_runts and _table_exists(conn, "cariche_sociali") else []
 
         sottosezioni = conn.execute(
-            "SELECT ss.cai_nome, json_extract(ss.cai_indirizzo_sede, '$.city') AS comune, "
-            "ss.cai_telefono_sede, ss.cai_telefono, ss.cai_email, ss.cai_soci, ss.cai_anno_fondazione "
-            "FROM enti e "
-            "JOIN sezioni_cai sc ON e.codice_fiscale = sc.cai_codice_fiscale "
-            "JOIN sottosezioni_cai ss ON sc.codice_cai = ss.cai_sezione_codice "
-            "WHERE e.id_runts = ? ORDER BY ss.cai_nome",
-            (id_runts,),
-        ).fetchall() if (
-            _table_exists(conn, "sezioni_cai") and _table_exists(conn, "sottosezioni_cai")
-        ) else []
+            "SELECT ss.*, json_extract(ss.cai_indirizzo_sede, '$.city') AS cai_comune "
+            "FROM sottosezioni_cai ss WHERE ss.cai_sezione_codice = ? ORDER BY ss.cai_nome",
+            (codice_cai,),
+        ).fetchall() if codice_cai and _table_exists(conn, "sottosezioni_cai") else []
     finally:
         conn.close()
 
-    fields = {k: row[k] for k in row.keys() if row[k] is not None and k not in ("id_runts", "raw_json", "updated_at")}
-    return _tr(request, "detail.html", {
-        "ente": row,
+    sezione_cai = None
+    if sc_row:
+        sezione_cai = dict(sc_row)
+        raw_addr = sezione_cai.get("cai_indirizzo_sede")
+        sezione_cai["cai_indirizzo_sede_parsed"] = _json.loads(raw_addr) if raw_addr else None
+
+    valid_tabs = {"cai", "principale", "bilanci", "allegati", "mappa", "sottosezioni"}
+    active_tab = tab if tab in valid_tabs else ("cai" if sezione_cai else "principale")
+    if active_tab == "cai" and not sezione_cai:
+        active_tab = "principale"
+    if active_tab == "principale" and not ente_row:
+        active_tab = "cai"
+
+    fields = {}
+    if ente_row:
+        fields = {k: ente_row[k] for k in ente_row.keys()
+                  if ente_row[k] is not None and k not in ("id_runts", "raw_json", "updated_at")}
+
+    return _tr(request, "sezione.html", {
+        "ente": ente_row,
         "fields": fields,
+        "sezione_cai": sezione_cai,
+        "sezione_id": sezione_id,
         "back": back or "/",
-        "lat": row["lat"] if "lat" in row.keys() else None,
-        "lon": row["lon"] if "lon" in row.keys() else None,
+        "lat": ente_row["lat"] if ente_row and "lat" in ente_row.keys() else (
+               sezione_cai.get("cai_lat") if sezione_cai else None),
+        "lon": ente_row["lon"] if ente_row and "lon" in ente_row.keys() else (
+               sezione_cai.get("cai_lon") if sezione_cai else None),
         "allegati": allegati,
         "bilanci": bilanci,
         "cariche": cariche,
         "sottosezioni": sottosezioni,
         "active_tab": active_tab,
+        "active_page": "sezioni",
     })
 
 

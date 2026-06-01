@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}{{ gr.gr_nome }} — RUNTS CAI{% endblock %}
+
+{% block head %}
+{% if lat and lon %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{{ back }}" class="btn btn-sm btn-outline-secondary">← Torna ai Gruppi Regionali</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+    <h1 class="h5 mb-0">{{ gr.gr_nome }}</h1>
+    <div class="d-flex gap-2 align-items-center">
+      {% if not ente %}
+      <span class="badge bg-secondary">Non agganciato RUNTS</span>
+      {% else %}
+      <span class="badge bg-success">ETS agganciato</span>
+      {% if ente.url_dettaglio %}
+      <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">Vedi su RUNTS ↗</a>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs px-3 mb-0" id="grTabs">
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'gr' %}active{% endif %}" id="tab-gr" data-bs-toggle="tab" href="#gr">Dati CAI</a>
+    </li>
+    {% if ente %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'ets' %}active{% endif %}" id="tab-ets" data-bs-toggle="tab" href="#ets">ETS</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'bilanci' %}active{% endif %}" id="tab-bilanci" data-bs-toggle="tab" href="#bilanci">Indicatori di bilancio</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'allegati' %}active{% endif %}" id="tab-allegati" data-bs-toggle="tab" href="#allegati">Atti e documenti</a>
+    </li>
+    {% endif %}
+    {% if lat and lon %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'mappa' %}active{% endif %}" id="tab-mappa" data-bs-toggle="tab" href="#mappa">Mappa</a>
+    </li>
+    {% endif %}
+  </ul>
+
+  <div class="tab-content" id="grTabContent">
+
+    {# Tab Dati CAI #}
+    <div class="tab-pane {% if active_tab == 'gr' %}show active{% endif %} p-3" id="gr">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Codice</dt>
+        <dd class="col-sm-9 font-monospace">{{ gr.gr_codice }}</dd>
+
+        {% if gr.gr_codice_fiscale %}
+        <dt class="col-sm-3">Codice fiscale</dt>
+        <dd class="col-sm-9 font-monospace">{{ gr.gr_codice_fiscale }}</dd>
+        {% endif %}
+
+        {% if gr.gr_partita_iva %}
+        <dt class="col-sm-3">Partita IVA</dt>
+        <dd class="col-sm-9 font-monospace">{{ gr.gr_partita_iva }}</dd>
+        {% endif %}
+
+        {% if gr.gr_email %}
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9"><a href="mailto:{{ gr.gr_email }}">{{ gr.gr_email }}</a></dd>
+        {% endif %}
+
+        {% if gr.gr_pec %}
+        <dt class="col-sm-3">PEC</dt>
+        <dd class="col-sm-9"><a href="mailto:{{ gr.gr_pec }}">{{ gr.gr_pec }}</a></dd>
+        {% endif %}
+
+        {% if gr.gr_telefono_sede %}
+        <dt class="col-sm-3">Tel. sede</dt>
+        <dd class="col-sm-9">{{ gr.gr_telefono_sede }}</dd>
+        {% endif %}
+
+        {% if gr.gr_telefono %}
+        <dt class="col-sm-3">Telefono</dt>
+        <dd class="col-sm-9">{{ gr.gr_telefono }}</dd>
+        {% endif %}
+
+        {% if gr.gr_fax %}
+        <dt class="col-sm-3">Fax</dt>
+        <dd class="col-sm-9">{{ gr.gr_fax }}</dd>
+        {% endif %}
+
+        {% if gr.gr_indirizzo_sede_parsed %}
+        <dt class="col-sm-3">Indirizzo</dt>
+        <dd class="col-sm-9">
+          {{ gr.gr_indirizzo_sede_parsed.get('address1','') }}
+          {% if gr.gr_indirizzo_sede_parsed.get('number') %} {{ gr.gr_indirizzo_sede_parsed.number }}{% endif %}
+          — {{ gr.gr_indirizzo_sede_parsed.get('zip','') }} {{ gr.gr_indirizzo_sede_parsed.get('city','') }}
+          ({{ gr.gr_indirizzo_sede_parsed.get('province','') }})
+        </dd>
+        {% endif %}
+
+        {% if gr.gr_sito_web %}
+        <dt class="col-sm-3">Sito web</dt>
+        <dd class="col-sm-9"><a href="{{ gr.gr_sito_web }}" target="_blank" rel="noopener">{{ gr.gr_sito_web }}</a></dd>
+        {% endif %}
+
+        {% if gr.gr_soci_ultimo_anno %}
+        <dt class="col-sm-3">Soci (ultimo anno)</dt>
+        <dd class="col-sm-9">{{ "{:,}".format(gr.gr_soci_ultimo_anno).replace(',','.') }}</dd>
+        {% endif %}
+
+        {% if gr.gr_descrizione %}
+        <dt class="col-sm-3">Descrizione</dt>
+        <dd class="col-sm-9 small">{{ gr.gr_descrizione | safe }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+
+    {# Tab ETS #}
+    {% if ente %}
+    <div class="tab-pane {% if active_tab == 'ets' %}show active{% endif %} p-3" id="ets">
+      <dl class="row mb-0">
+        {% set labels = {
+          "denominazione": "Denominazione RUNTS",
+          "codice_fiscale": "Codice fiscale",
+          "forma_giuridica": "Forma giuridica",
+          "sezione_registro": "Sezione del registro",
+          "data_iscrizione": "Data iscrizione",
+          "sede_indirizzo": "Indirizzo",
+          "sede_civico": "Civico",
+          "sede_comune": "Comune",
+          "sede_provincia": "Provincia",
+          "sede_regione": "Regione",
+          "sede_cap": "CAP",
+          "rappresentante_legale": "Rappresentante legale",
+          "pec": "PEC",
+          "sito_web": "Sito web"
+        } %}
+        {% for key, label in labels.items() %}
+          {% if fields.get(key) %}
+          <dt class="col-sm-4 col-md-3 text-muted small">{{ label }}</dt>
+          <dd class="col-sm-8 col-md-9">
+            {% if key == "pec" %}<a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
+            {% elif key == "sito_web" %}<a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
+            {% else %}{{ fields[key] }}{% endif %}
+          </dd>
+          {% endif %}
+        {% endfor %}
+      </dl>
+      {% if cariche %}
+      <div class="mt-4">
+        <h6 class="text-muted fw-semibold small text-uppercase mb-2">Persone e cariche</h6>
+        <table class="table table-sm table-hover">
+          <thead class="table-light">
+            <tr><th>Ruolo</th><th>Nome</th><th>Cognome</th><th>CF</th><th>Dal</th><th>Al</th></tr>
+          </thead>
+          <tbody>
+            {% for c in cariche %}
+            <tr class="{{ '' if c.valid_to is none else 'text-muted' }}">
+              <td class="small">{{ c.ruolo or "—" }}</td>
+              <td>{{ c.nome or "—" }}</td>
+              <td>{{ c.cognome or "—" }}</td>
+              <td class="small font-monospace">{{ c.codice_fiscale | mask_cf }}</td>
+              <td class="small">{{ c.valid_from or "—" }}</td>
+              <td class="small">{{ c.valid_to or "in carica" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Tab Bilanci #}
+    <div class="tab-pane {% if active_tab == 'bilanci' %}show active{% endif %}" id="bilanci">
+      {% if bilanci %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Anno</th><th class="text-end">Proventi</th><th class="text-end">Oneri</th><th class="text-end">Risultato</th></tr>
+          </thead>
+          <tbody>
+            {% for b in bilanci %}
+            <tr>
+              <td>{{ b.anno }}</td>
+              <td class="text-end">{{ b.totale_proventi | format_euro }}</td>
+              <td class="text-end">{{ b.totale_oneri | format_euro }}</td>
+              <td class="text-end">
+                {% if b.risultato_esercizio is not none %}
+                <span class="{{ 'text-danger' if b.risultato_esercizio < 0 else 'text-success' }}">{{ b.risultato_esercizio | format_euro }}</span>
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted p-3 mb-0">Nessun dato di bilancio disponibile.</p>
+      {% endif %}
+    </div>
+
+    {# Tab Allegati #}
+    <div class="tab-pane {% if active_tab == 'allegati' %}show active{% endif %}" id="allegati">
+      {% if allegati %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Tipo</th><th>Cod. pratica</th><th>Anno</th><th>Dim.</th><th>Download</th></tr>
+          </thead>
+          <tbody>
+            {% for att in allegati %}
+            <tr>
+              <td class="small">{{ att.tipo or "—" }}</td>
+              <td class="small text-muted">{{ att.codice_pratica or "—" }}</td>
+              <td>{{ att.anno or "—" }}</td>
+              <td class="small text-muted">{{ att.size | human_size }}</td>
+              <td>
+                {% if att.path %}<a href="/attachments/{{ ente.id_runts }}/{{ att.filename }}" class="btn btn-sm btn-outline-primary py-0">Scarica</a>
+                {% else %}<span class="text-muted small">{{ att.skip_reason or "—" }}</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted p-3 mb-0">Nessun documento disponibile.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# Tab Mappa #}
+    {% if lat and lon %}
+    <div class="tab-pane {% if active_tab == 'mappa' %}show active{% endif %}" id="mappa">
+      <div id="gr-map" style="height:450px; width:100%;"></div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('#grTabs [data-bs-toggle="tab"]').forEach(function(el) {
+    el.addEventListener('shown.bs.tab', function(e) {
+      var slug = e.target.getAttribute('href').replace('#', '');
+      var url = new URL(window.location.href);
+      url.searchParams.set('tab', slug);
+      history.replaceState(null, '', url.toString());
+    });
+  });
+</script>
+{% if lat and lon %}
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  var _mapInit = false;
+  function _initMap() {
+    if (_mapInit) return; _mapInit = true;
+    var m = L.map('gr-map').setView([{{ lat }}, {{ lon }}], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
+    }).addTo(m);
+    L.marker([{{ lat }}, {{ lon }}]).addTo(m).bindPopup({{ gr.gr_nome | tojson }}).openPopup();
+  }
+  if (document.getElementById('mappa') && document.getElementById('mappa').classList.contains('show')) _initMap();
+  var _tabMappa = document.getElementById('tab-mappa');
+  if (_tabMappa) _tabMappa.addEventListener('shown.bs.tab', _initMap);
+</script>
+{% endif %}
+{% endblock %}

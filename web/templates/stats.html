@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Statistiche — RUNTS · Sezioni CAI{% endblock %}
+{% block content %}
+<h1 class="h3 mb-1">Statistiche</h1>
+<p class="text-muted mb-4">In costruzione</p>
+
+<div class="row g-3">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-primary">{{ counts.sezioni_cai }}</div>
+        <div class="card-text text-muted mt-1">Sezioni CAI</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-success">{{ counts.enti }}</div>
+        <div class="card-text text-muted mt-1">Enti ETS</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-info">{{ counts.allegati }}</div>
+        <div class="card-text text-muted mt-1">Allegati</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="display-6 fw-bold text-warning">{{ counts.bilanci }}</div>
+        <div class="card-text text-muted mt-1">Bilanci analizzati</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

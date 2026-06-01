@@ -1,0 +1,92 @@
+{% set s = sezione_cai %}
+<dl class="row mb-0">
+  <dt class="col-sm-3">Codice CAI</dt>
+  <dd class="col-sm-9 font-monospace">{{ s.codice_cai or '—' }}</dd>
+
+  <dt class="col-sm-3">Denominazione CAI</dt>
+  <dd class="col-sm-9">{{ s.cai_denominazione or '—' }}</dd>
+
+  <dt class="col-sm-3">Regione</dt>
+  <dd class="col-sm-9">{{ s.cai_regione or '—' }}</dd>
+
+  {% if s.cai_codice_fiscale %}
+  <dt class="col-sm-3">Codice fiscale CAI</dt>
+  <dd class="col-sm-9 font-monospace">{{ s.cai_codice_fiscale }}</dd>
+  {% endif %}
+
+  {% if s.cai_partita_iva %}
+  <dt class="col-sm-3">Partita IVA</dt>
+  <dd class="col-sm-9 font-monospace">{{ s.cai_partita_iva }}</dd>
+  {% endif %}
+
+  {% if s.cai_email %}
+  <dt class="col-sm-3">Email</dt>
+  <dd class="col-sm-9"><a href="mailto:{{ s.cai_email }}">{{ s.cai_email }}</a></dd>
+  {% endif %}
+
+  {% if s.cai_pec %}
+  <dt class="col-sm-3">PEC</dt>
+  <dd class="col-sm-9"><a href="mailto:{{ s.cai_pec }}">{{ s.cai_pec }}</a></dd>
+  {% endif %}
+
+  {% if s.cai_telefono_sede %}
+  <dt class="col-sm-3">Tel. sede</dt>
+  <dd class="col-sm-9">{{ s.cai_telefono_sede }}</dd>
+  {% endif %}
+
+  {% if s.cai_telefono %}
+  <dt class="col-sm-3">Telefono</dt>
+  <dd class="col-sm-9">{{ s.cai_telefono }}</dd>
+  {% endif %}
+
+  {% if s.cai_fax %}
+  <dt class="col-sm-3">Fax</dt>
+  <dd class="col-sm-9">{{ s.cai_fax }}</dd>
+  {% endif %}
+
+  {% if s.cai_indirizzo_sede_parsed %}
+  <dt class="col-sm-3">Indirizzo sede</dt>
+  <dd class="col-sm-9">
+    {{ s.cai_indirizzo_sede_parsed.get('address1','') }}
+    {% if s.cai_indirizzo_sede_parsed.get('number') %} {{ s.cai_indirizzo_sede_parsed.number }}{% endif %}
+    — {{ s.cai_indirizzo_sede_parsed.get('zip','') }} {{ s.cai_indirizzo_sede_parsed.get('city','') }}
+    ({{ s.cai_indirizzo_sede_parsed.get('province','') }})
+  </dd>
+  {% endif %}
+
+  {% if s.cai_sito_web %}
+  <dt class="col-sm-3">Sito web</dt>
+  <dd class="col-sm-9"><a href="https://{{ s.cai_sito_web }}" target="_blank" rel="noopener">{{ s.cai_sito_web }}</a></dd>
+  {% endif %}
+
+  {% if s.cai_anno_fondazione %}
+  <dt class="col-sm-3">Anno fondazione</dt>
+  <dd class="col-sm-9">{{ s.cai_anno_fondazione }}</dd>
+  {% endif %}
+
+  {% if s.cai_soci_ultimo_anno %}
+  <dt class="col-sm-3">Soci (ultimo anno)</dt>
+  <dd class="col-sm-9">{{ "{:,}".format(s.cai_soci_ultimo_anno).replace(',','.') }}</dd>
+  {% endif %}
+
+  {% if s.cai_orari %}
+  <dt class="col-sm-3">Orari</dt>
+  <dd class="col-sm-9 small">{{ s.cai_orari | safe }}</dd>
+  {% endif %}
+
+  {% if s.cai_lat and s.cai_lon %}
+  <dt class="col-sm-3">Coordinate CAI</dt>
+  <dd class="col-sm-9 font-monospace small">{{ s.cai_lat }}, {{ s.cai_lon }}</dd>
+  {% endif %}
+
+  {% if s.cai_match_note and s.cai_match_note != 'exact_cf' %}
+  <dt class="col-sm-3">Qualità match</dt>
+  <dd class="col-sm-9">
+    {% if s.cai_match_note == 'fuzzy_nome' %}
+    <span class="badge bg-warning text-dark">CF mancante nel registro CAI</span>
+    {% elif s.cai_match_note.startswith('cf_mismatch') %}
+    <span class="badge bg-danger">CF discordante — {{ s.cai_match_note }}</span>
+    {% endif %}
+  </dd>
+  {% endif %}
+</dl>

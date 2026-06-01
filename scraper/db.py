@@ -151,6 +151,27 @@ CREATE TABLE IF NOT EXISTS sottosezioni_cai (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sottosezioni_cai_sezione ON sottosezioni_cai(cai_sezione_codice);
+
+CREATE TABLE IF NOT EXISTS gruppi_regionali_cai (
+    gr_codice              TEXT PRIMARY KEY,
+    gr_nome                TEXT NOT NULL,
+    gr_codice_fiscale      TEXT,
+    gr_partita_iva         TEXT,
+    gr_email               TEXT,
+    gr_pec                 TEXT,
+    gr_telefono_sede       TEXT,
+    gr_telefono            TEXT,
+    gr_fax                 TEXT,
+    gr_indirizzo_sede      TEXT,
+    gr_indirizzo_postale   TEXT,
+    gr_sito_web            TEXT,
+    gr_descrizione         TEXT,
+    gr_soci_ultimo_anno    INTEGER,
+    gr_scraped_at          TEXT,
+    gr_id_runts            TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_gr_cai_cf ON gruppi_regionali_cai(gr_codice_fiscale);
 """
 
 _MIGRATIONS = [
@@ -268,6 +289,25 @@ _MIGRATIONS = [
         cai_scraped_at      TEXT
     )""",
     "CREATE INDEX IF NOT EXISTS idx_sottosezioni_cai_sezione ON sottosezioni_cai(cai_sezione_codice)",
+    """CREATE TABLE IF NOT EXISTS gruppi_regionali_cai (
+        gr_codice              TEXT PRIMARY KEY,
+        gr_nome                TEXT NOT NULL,
+        gr_codice_fiscale      TEXT,
+        gr_partita_iva         TEXT,
+        gr_email               TEXT,
+        gr_pec                 TEXT,
+        gr_telefono_sede       TEXT,
+        gr_telefono            TEXT,
+        gr_fax                 TEXT,
+        gr_indirizzo_sede      TEXT,
+        gr_indirizzo_postale   TEXT,
+        gr_sito_web            TEXT,
+        gr_descrizione         TEXT,
+        gr_soci_ultimo_anno    INTEGER,
+        gr_scraped_at          TEXT,
+        gr_id_runts            TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_gr_cai_cf ON gruppi_regionali_cai(gr_codice_fiscale)",
 ]
 
 
@@ -486,6 +526,30 @@ def upsert_sezione_cai(conn: sqlite3.Connection, data: dict) -> str:
     row["cai_scraped_at"] = row.get("cai_scraped_at") or now
     conn.execute(
         f"INSERT OR REPLACE INTO sezioni_cai ({', '.join(cols)}) "
+        f"VALUES ({', '.join(':' + c for c in cols)})",
+        row,
+    )
+    conn.commit()
+    return action
+
+
+def upsert_gruppo_regionale(conn: sqlite3.Connection, data: dict) -> str:
+    """Insert or replace a CAI regional group. Returns 'inserted' or 'updated'."""
+    now = datetime.now(timezone.utc).isoformat()
+    cols = [
+        "gr_codice", "gr_nome", "gr_codice_fiscale", "gr_partita_iva",
+        "gr_email", "gr_pec", "gr_telefono_sede", "gr_telefono", "gr_fax",
+        "gr_indirizzo_sede", "gr_indirizzo_postale", "gr_sito_web",
+        "gr_descrizione", "gr_soci_ultimo_anno", "gr_scraped_at", "gr_id_runts",
+    ]
+    existing = conn.execute(
+        "SELECT gr_codice FROM gruppi_regionali_cai WHERE gr_codice = ?", (data.get("gr_codice"),)
+    ).fetchone()
+    action = "updated" if existing else "inserted"
+    row = {c: data.get(c) for c in cols}
+    row["gr_scraped_at"] = row.get("gr_scraped_at") or now
+    conn.execute(
+        f"INSERT OR REPLACE INTO gruppi_regionali_cai ({', '.join(cols)}) "
         f"VALUES ({', '.join(':' + c for c in cols)})",
         row,
     )

@@ -17,6 +17,7 @@ _REGIONS = [
 
 _SECTIONS_URL = "https://www.cai.it/wp-json/cai-section/v2/sections-list-simple"
 _SUBSECTIONS_URL = "https://www.cai.it/wp-json/cai-section/v2/sections/{code}/sub-sections-list"
+_REGIONAL_GROUPS_URL = "https://www.cai.it/wp-json/cai-section/v2/regional-groups-list"
 _MAX_RETRIES = 3
 
 
@@ -106,6 +107,49 @@ def fetch_subsections(codice_sezione: str) -> list[dict]:
         logger.warning("Unexpected response type for subsections of %s: %s", codice_sezione, type(data).__name__)
         return []
     return [_normalize_subsection(raw, codice_sezione) for raw in data]
+
+
+def fetch_regional_groups() -> list[dict]:
+    """Fetch all 21 CAI regional groups from the REST API."""
+    _HEADERS = {"Origin": "https://www.cai.it", "Referer": "https://www.cai.it/"}
+    with httpx.Client(timeout=30.0, headers=_HEADERS) as client:
+        logger.info("Fetching CAI regional groups...")
+        def _fetch(c: httpx.Client = client) -> Any:
+            resp = c.get(_REGIONAL_GROUPS_URL)
+            resp.raise_for_status()
+            return resp.json()
+
+        data = _with_retry(_fetch)
+
+    if not isinstance(data, list):
+        logger.error("Unexpected response type for regional groups: %s", type(data).__name__)
+        return []
+
+    now = datetime.now(timezone.utc).isoformat()
+    results = []
+    for raw in data:
+        office_addr = raw.get("officeAddress") or raw.get("office_address")
+        postal_addr = raw.get("postalAddress") or raw.get("postal_address")
+        results.append({
+            "gr_codice": raw.get("code"),
+            "gr_nome": raw.get("name") or "",
+            "gr_codice_fiscale": raw.get("cf") or None,
+            "gr_partita_iva": raw.get("vat") or None,
+            "gr_email": raw.get("email") or None,
+            "gr_pec": raw.get("pec") or None,
+            "gr_telefono_sede": raw.get("officePhone") or None,
+            "gr_telefono": raw.get("phone") or None,
+            "gr_fax": raw.get("fax") or None,
+            "gr_indirizzo_sede": json.dumps(office_addr, ensure_ascii=False) if office_addr else None,
+            "gr_indirizzo_postale": json.dumps(postal_addr, ensure_ascii=False) if postal_addr else None,
+            "gr_sito_web": raw.get("website") or None,
+            "gr_descrizione": raw.get("description") or None,
+            "gr_soci_ultimo_anno": raw.get("lastyearMembershipsCount") or None,
+            "gr_scraped_at": now,
+        })
+
+    logger.info("Totale gruppi regionali recuperati: %d", len(results))
+    return results
 
 
 def fetch_all_sections() -> list[dict]:
