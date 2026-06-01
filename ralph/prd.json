@@ -1,22 +1,18 @@
 {
   "project": "RUNTS-CAI",
-  "branchName": "ralph/sezioni-cai",
-  "description": "Integrazione dati CAI — scraping sezioni e sottosezioni da cai.it REST API, nuova lista principale da sezioni_cai, filtro ETS, quinta tab Sottosezioni nella scheda ente.",
+  "branchName": "ralph/ux-nav-filtri",
+  "description": "UX — Header sticky, footer fixed-bottom MS SCPA, menu 4 voci, lista 50 risultati, filtro sanity check, pagina ETS, scraper Gruppi Regionali, pagina GR, stub stats.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Tabelle sezioni_cai e sottosezioni_cai + migration + upsert",
-      "description": "As a developer, I need two database tables to store CAI section and sub-section data so that they can be queried independently and linked by parent code.",
+      "title": "Header sticky-top",
+      "description": "As a user, I want the header to stay visible while scrolling so that I can always access navigation.",
       "acceptanceCriteria": [
-        "In scraper/db.py, aggiungere CREATE TABLE IF NOT EXISTS sezioni_cai con colonne: codice_cai TEXT PRIMARY KEY, cai_denominazione TEXT NOT NULL, cai_codice_fiscale TEXT, cai_partita_iva TEXT, cai_email TEXT, cai_pec TEXT, cai_telefono_sede TEXT, cai_telefono TEXT, cai_fax TEXT, cai_indirizzo_sede TEXT, cai_indirizzo_postale TEXT, cai_sito_web TEXT, cai_orari TEXT, cai_avvisi TEXT, cai_anno_fondazione INTEGER, cai_soci_ultimo_anno INTEGER, cai_lat REAL, cai_lon REAL, cai_regione TEXT NOT NULL, cai_scraped_at TEXT",
-        "Aggiungere CREATE TABLE IF NOT EXISTS sottosezioni_cai con colonne: cai_codice TEXT PRIMARY KEY, cai_sezione_codice TEXT NOT NULL REFERENCES sezioni_cai(codice_cai), cai_nome TEXT NOT NULL, cai_email TEXT, cai_telefono_sede TEXT, cai_telefono TEXT, cai_indirizzo_sede TEXT, cai_sito_web TEXT, cai_orari TEXT, cai_avvisi TEXT, cai_anno_fondazione INTEGER, cai_soci INTEGER, cai_lat REAL, cai_lon REAL, cai_scraped_at TEXT",
-        "Aggiungere entrambe le migration a _MIGRATIONS con il DDL completo",
-        "Aggiungere indice idx_sezioni_cai_cf su cai_codice_fiscale",
-        "Aggiungere indice idx_sezioni_cai_regione su cai_regione",
-        "Aggiungere indice idx_sottosezioni_cai_sezione su cai_sezione_codice",
-        "Implementare upsert_sezione_cai(conn, data) in scraper/db.py: INSERT OR REPLACE su codice_cai",
-        "Implementare upsert_sottosezione_cai(conn, data) in scraper/db.py: INSERT OR REPLACE su cai_codice",
-        "Typecheck passes"
+        "In web/templates/base.html, aggiungere classe sticky-top al <nav class=\"navbar\">",
+        "L'header rimane visibile durante lo scroll su tutte le pagine",
+        "Nessuna regressione nel layout esistente",
+        "Typecheck passes",
+        "Verify in browser: scrollare la lista con 529 sezioni, l'header resta in cima"
       ],
       "priority": 1,
       "passes": true,
@@ -24,115 +20,157 @@
     },
     {
       "id": "US-002",
-      "title": "scraper/cai_scraper.py — fetch sezioni da REST API per 20 regioni",
-      "description": "As a developer, I need a scraper module that fetches all CAI sections from the cai.it REST API so that the sezioni_cai table is populated.",
+      "title": "Footer fixed-bottom con info Montagna Servizi SCPA",
+      "description": "As a user, I want a footer always visible at the bottom of the viewport with company information.",
       "acceptanceCriteria": [
-        "Creare scraper/cai_scraper.py con funzione fetch_all_sections() -> list[dict]",
-        "La funzione itera su 20 slug regione: ['abruzzo','basilicata','calabria','campania','emilia-romagna','friuli-venezia-giulia','lazio','liguria','lombardia','marche','molise','piemonte','puglia','sardegna','sicilia','toscana','trentino-alto-adige','umbria','valle-d-aosta','veneto']",
-        "Per ogni regione chiama GET https://www.cai.it/wp-json/cai-section/v2/sections-list-simple?region=<regione> con httpx (già in requirements)",
-        "Normalizza il JSON: serializza officeAddress e postalAddress come json.dumps(), mappa tutti i campi API sui nomi colonna DB con prefisso cai_",
-        "Gestisce errori di rete con retry max 3 tentativi e backoff esponenziale",
-        "Typecheck passes"
+        "In web/templates/base.html, aggiungere un <footer class=\"footer fixed-bottom bg-dark text-white py-2\"> con testo: 'Montagna Servizi S.C.P.A. — Via Errico Petrella 19, 20124 Milano — montagnaservizi.com'",
+        "Aggiungere al body o al container principale un padding-bottom sufficiente (es. pb-5) per evitare che il footer copra il contenuto",
+        "Il footer è presente su tutte le pagine (list, detail, ets, gruppi-regionali, stats)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "scraper/cai_scraper.py — fetch sottosezioni per ogni sezione",
-      "description": "As a developer, I need the scraper to fetch sub-sections for each CAI section so that the sottosezioni_cai table is populated.",
+      "title": "Menu di navigazione con 4 voci e voce attiva",
+      "description": "As a user, I want a navigation menu so that I can move between the main sections of the app.",
       "acceptanceCriteria": [
-        "In scraper/cai_scraper.py, aggiungere funzione fetch_subsections(codice_sezione: str) -> list[dict]",
-        "Chiama GET https://www.cai.it/wp-json/cai-section/v2/sections/{codice_sezione}/sub-sections-list con header Origin: https://www.cai.it",
-        "Se la risposta è vuota o 404, ritorna lista vuota senza errore",
-        "Normalizza la risposta aggiungendo cai_sezione_codice = codice_sezione a ogni record e mappando i campi con prefisso cai_",
-        "Gestisce errori di rete con retry max 3 tentativi e backoff esponenziale",
-        "Typecheck passes"
+        "In web/templates/base.html, aggiungere 4 voci <a class=\"nav-link\"> nella navbar: Sezioni (href=/), Gruppi Regionali (href=/gruppi-regionali), ETS (href=/ets), Statistiche (href=/stats)",
+        "La voce attiva usa {% if active_page == 'sezioni' %}active{% endif %} ecc. per la classe Bootstrap active",
+        "In web/app.py, tutte le route esistenti passano active_page al template: / -> 'sezioni', /ets -> 'ets', /gruppi-regionali -> 'gruppi-regionali', /stats -> 'stats'",
+        "Il menu è collassabile su mobile tramite Bootstrap navbar-toggler",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "scraper/cai_main.py — CLI entry point con report",
-      "description": "As a developer, I need a runnable CLI entry point for the CAI scraper so that it can be executed from the command line.",
+      "title": "Lista risultati a 50 elementi per pagina",
+      "description": "As a user, I want to see 50 results per page so that I scroll less and find items faster.",
       "acceptanceCriteria": [
-        "Creare scraper/cai_main.py con argparse: --db PATH (default: runts.db), --verbose, --no-subsections (skip sottosezioni fetch)",
-        "Esegue fetch_all_sections() e upsert_sezione_cai() per ogni record",
-        "Per ogni sezione, chiama fetch_subsections(codice) e upsert_sottosezione_cai() per ogni risultato, salvo --no-subsections",
-        "Stampa report finale: sezioni scaricate, sottosezioni scaricate, inserite, aggiornate, fallite",
-        "Eseguibile come python3 -m scraper.cai_main",
-        "Typecheck passes"
+        "In web/app.py, cambiare PAGE_SIZE = 20 in PAGE_SIZE = 50",
+        "Il numero di pagine totali si aggiorna di conseguenza",
+        "La paginazione LIMIT/OFFSET funziona correttamente",
+        "Typecheck passes",
+        "Verify in browser: la lista mostra 50 sezioni sulla prima pagina"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Lista principale / migrata su sezioni_cai con LEFT JOIN enti",
-      "description": "As a user, I want the main list to show all CAI sections (not just RUNTS entities) so that I have a complete view of the CAI network.",
+      "title": "Filtro ?issues=1 Sanity check nella lista Sezioni",
+      "description": "As a user, I want to filter the section list to show only entries with data quality issues so that I can identify problems.",
       "acceptanceCriteria": [
-        "In web/app.py, la route GET / fa SELECT su sezioni_cai come sorgente principale con LEFT JOIN enti ON sezioni_cai.cai_codice_fiscale = enti.codice_fiscale",
-        "Le colonne restituite sono: codice_cai, cai_denominazione, cai_regione, comune (estratto da cai_indirizzo_sede JSON campo city), id_runts (NULL se no match RUNTS)",
-        "Il filtro regione usa cai_regione invece di sede_regione",
-        "La paginazione LIMIT/OFFSET funziona correttamente",
+        "In web/app.py, aggiungere parametro issues: Optional[int] = None alla route GET /",
+        "Quando issues=1, la query aggiunge WHERE con OR tra: (s.cai_match_note = 'fuzzy_nome'), (s.cai_match_note LIKE 'cf_mismatch%'), (e.lat IS NULL OR e.lon IS NULL), (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bilanci b WHERE b.id_runts = e.id_runts)), (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM allegati a WHERE a.id_runts = e.id_runts))",
+        "In web/templates/list.html, aggiungere checkbox 'Solo problemi dati' con name=issues value=1 accanto al checkbox Solo sezioni ETS",
+        "Il filtro si riflette nell'URL (?issues=1) e persiste nella paginazione",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser: attivare il filtro e verificare che compaiano solo sezioni con badge ⚠ o senza bilanci/allegati"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Colonna codice CAI + badge ETS nella lista",
-      "description": "As a user, I want to see the CAI section code and an ETS badge in the list so that I can identify sections at a glance.",
+      "title": "Pagina /ets con lista enti RUNTS e status agganciamento",
+      "description": "As a user, I want a dedicated page showing all 226 RUNTS entities with their CAI link status so that I can spot unlinked sections.",
       "acceptanceCriteria": [
-        "Ogni riga della lista mostra codice_cai in una colonna dedicata",
-        "Le righe con id_runts non null mostrano un badge <span class=\"badge bg-success\">ETS</span>",
-        "Il link /ente/<id_runts> è presente solo se id_runts è non null; le righe senza match RUNTS mostrano solo il testo della denominazione",
+        "Creare route GET /ets in web/app.py con SELECT su enti LEFT JOIN sezioni_cai ON enti.codice_fiscale = sezioni_cai.cai_codice_fiscale; ORDER BY (CASE WHEN sezioni_cai.codice_cai IS NULL THEN 0 ELSE 1 END), enti.denominazione",
+        "Creare web/templates/ets.html con tabella: Denominazione (link /ente/<id_runts>), Comune, Regione, Codice CAI (sezioni_cai.codice_cai o '—'), Status",
+        "Colonna Status: badge bg-success 'Agganciato' se match esatto, badge bg-warning 'CF mancante CAI' se cai_match_note=fuzzy_nome, badge bg-danger 'CF discordante' se cai_match_note LIKE cf_mismatch%, badge bg-warning text-dark 'Non agganciato' se nessun match",
+        "In cima alla pagina: contatore '226 enti ETS — X agganciati, Y non agganciati'",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser: aprire /ets e verificare che i 31 enti non agganciati compaiano in cima con badge arancione"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Filtro ?ets=1 Solo sezioni ETS nella lista",
-      "description": "As a user, I want to filter the list to show only sections registered on RUNTS so that I can focus on ETS entities.",
+      "title": "DB — tabella gruppi_regionali_cai + migration + upsert",
+      "description": "As a developer, I need a database table for CAI regional groups so that they can be stored and queried.",
       "acceptanceCriteria": [
-        "Aggiungere checkbox o toggle 'Solo sezioni ETS' nella barra filtri della lista",
-        "Quando attivo, la query aggiunge WHERE cai_codice_fiscale IS NOT NULL AND enti.id_runts IS NOT NULL",
-        "Il filtro si riflette nell'URL (?ets=1) e persiste tra le pagine",
-        "Il contatore totale si aggiorna in base al filtro attivo",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "In scraper/db.py, aggiungere CREATE TABLE IF NOT EXISTS gruppi_regionali_cai con colonne: gr_codice TEXT PRIMARY KEY, gr_nome TEXT NOT NULL, gr_codice_fiscale TEXT, gr_partita_iva TEXT, gr_email TEXT, gr_pec TEXT, gr_telefono_sede TEXT, gr_telefono TEXT, gr_fax TEXT, gr_indirizzo_sede TEXT, gr_indirizzo_postale TEXT, gr_sito_web TEXT, gr_descrizione TEXT, gr_soci_ultimo_anno INTEGER, gr_scraped_at TEXT, gr_id_runts TEXT",
+        "Aggiungere migration a _MIGRATIONS con il DDL completo",
+        "Aggiungere indice idx_gr_cai_cf su gr_codice_fiscale",
+        "Implementare upsert_gruppo_regionale(conn, data) in scraper/db.py: INSERT OR REPLACE su gr_codice",
+        "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Scheda ente: quinta tab Sottosezioni",
-      "description": "As a user, I want a dedicated tab for sub-sections on the section detail page so that I can see all local groups belonging to this section.",
+      "title": "scraper/cai_scraper.py — fetch_regional_groups()",
+      "description": "As a developer, I need a function to fetch the 21 CAI regional groups from the REST API.",
       "acceptanceCriteria": [
-        "In web/app.py, la route GET /ente/{id_runts} recupera le sottosezioni tramite JOIN sezioni_cai -> sottosezioni_cai su codice_cai = cai_sezione_codice, usando cai_codice_fiscale come ponte con enti.codice_fiscale; passa lista sottosezioni ordinata per cai_nome",
-        "In web/app.py, aggiungere 'sottosezioni' a _VALID_TABS",
-        "In web/templates/detail.html, aggiungere quinta tab 'Sottosezioni' (slug: sottosezioni) al nav-tabs dopo 'Mappa'",
-        "Il pannello tab-pane#sottosezioni mostra tabella con colonne: Nome, Comune (da cai_indirizzo_sede JSON campo city), Telefono, Email, Soci, Anno fondazione",
-        "Se sottosezioni è lista vuota, mostra <p class=\"text-muted\">Nessuna sottosezione registrata.</p>",
-        "La tab e' sempre visibile nel menu",
-        "Typecheck passes",
-        "Verify in browser: aprire scheda sezione CAI Bergamo (cai_codice_fiscale 80004970168) tab Sottosezioni -> mostra 30 sottosezioni; aprire CAI Pisa -> mostra messaggio vuoto"
+        "In scraper/cai_scraper.py, aggiungere funzione fetch_regional_groups() -> list[dict]",
+        "Chiama GET https://www.cai.it/wp-json/cai-section/v2/regional-groups-list con header Origin: https://www.cai.it e Referer: https://www.cai.it/",
+        "Normalizza con prefisso gr_: code->gr_codice, name->gr_nome, cf->gr_codice_fiscale, vat->gr_partita_iva, email->gr_email, pec->gr_pec, officePhone->gr_telefono_sede, phone->gr_telefono, fax->gr_fax, website->gr_sito_web, description->gr_descrizione, lastyearMembershipsCount->gr_soci_ultimo_anno",
+        "Serializza officeAddress e postalAddress come json.dumps()",
+        "Retry max 3 tentativi con backoff esponenziale",
+        "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "scraper/cai_main.py — fetch GR + matching CF/nome con enti",
+      "description": "As a developer, I need the CAI CLI to fetch regional groups and auto-match them with RUNTS entities.",
+      "acceptanceCriteria": [
+        "In scraper/cai_main.py, aggiungere flag --no-groups (skip GR fetch); default: fetch GR",
+        "Senza --no-groups, chiama fetch_regional_groups() e upsert_gruppo_regionale() per ogni record",
+        "Matching automatico con enti in ordine di priorità: (1) match esatto gr_codice_fiscale = enti.codice_fiscale quando gr_codice_fiscale non è NULL; (2) fallback fuzzy per nome normalizzato con score >= 0.5 (stesso algoritmo già in use per sezioni_cai); aggiorna gr_id_runts se trovato",
+        "Il report finale include: GR scaricati, inseriti, aggiornati, agganciati a RUNTS",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Pagina /gruppi-regionali con lista 21 GR CAI",
+      "description": "As a user, I want a page showing all 21 CAI regional groups with contact info and RUNTS link.",
+      "acceptanceCriteria": [
+        "Creare route GET /gruppi-regionali in web/app.py con SELECT su gruppi_regionali_cai LEFT JOIN enti ON gr_id_runts = enti.id_runts ORDER BY gr_nome; passare active_page='gruppi-regionali'",
+        "Creare web/templates/gruppi_regionali.html con tabella: Nome GR, Provincia (da gr_indirizzo_sede JSON campo province), Email, Telefono, Sito web, Ente RUNTS (link /ente/<gr_id_runts> se agganciato, altrimenti badge bg-warning 'Non agganciato')",
+        "Righe con gr_id_runts null evidenziate con class table-warning",
+        "Contatore in cima: '21 Gruppi Regionali — X agganciati a RUNTS, Y non agganciati'",
+        "Se la tabella gruppi_regionali_cai è vuota, mostrare <p class=\"text-muted\">Nessun dato disponibile. Eseguire python3 -m scraper.cai_main per popolare.</p>",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Route stub /stats con numeri di riepilogo",
+      "description": "As a developer, I need a placeholder stats route with summary counts so that the menu link works.",
+      "acceptanceCriteria": [
+        "Creare route GET /stats in web/app.py che legge dal DB: COUNT(*) FROM sezioni_cai, COUNT(*) FROM enti, COUNT(*) FROM allegati, COUNT(*) FROM bilanci; passare active_page='stats'",
+        "Creare web/templates/stats.html con titolo 'Statistiche', sottotitolo 'In costruzione', e 4 card Bootstrap con i contatori: Sezioni CAI, Enti ETS, Allegati, Bilanci analizzati",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
       "notes": ""
     }
   ]
