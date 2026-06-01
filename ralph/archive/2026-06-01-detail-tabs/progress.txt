@@ -1,0 +1,96 @@
+## Codebase Patterns
+- Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
+- FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
+- No mypy installed in the venv; typecheck = syntax OK + pytest passing
+- `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
+- SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
+- `base.html` includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — add BS5 JS bundle directly in templates that need it (e.g. for `data-bs-toggle="tab"` and `shown.bs.tab`)
+- detail.html uses Bootstrap 5 nav-tabs with `data-bs-toggle="tab"` + Jinja2 `active_tab` for server-side initial state; JS adds `history.replaceState` and Leaflet lazy init via `shown.bs.tab`
+
+# Ralph Progress Log
+Started: Lun  1 Giu 2026 14:09:49 CEST
+---
+
+## 2026-06-01 - US-001
+- Added `_VALID_TABS` set and `active_tab` logic to `ente_detail` route in `web/app.py`
+- Reads `request.query_params.get("tab", "principale")`, normalizes unknown values to "principale"
+- Passes `active_tab` to template context alongside all existing context vars
+- Files changed: `web/app.py`
+- **Learnings for future iterations:**
+  - The pre-commit hook runs pytest automatically — no need to manually run tests before committing
+  - FastAPI query params can be read via `request.query_params.get()` without declaring them in the function signature
+  - The template context dict is the third positional arg to `_tr()`
+---
+
+## 2026-06-01 - US-002
+- Restructured `web/templates/detail.html` to add Bootstrap 5 nav-tabs skeleton
+- Moved "Scarica scheda PDF" and "Vedi su RUNTS" buttons from card-footer to card-header (dark bg → btn-outline-light)
+- Added `<ul class="nav nav-tabs">` with 4 `<li>` items (principale, bilanci, allegati, mappa); active class set via Jinja2 `active_tab`
+- Added `<div class="tab-content">` with 4 tab panes; principale pane contains the dl fields (moved from card-body); other panes are empty (content moves in US-003–006)
+- Existing bilanci, allegati, cariche, mappa sections remain as separate cards below the main card (intermediate state)
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - base.html includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — tab switching uses plain `<a href="?tab=...">` links (server-side) rather than data-bs-toggle; US-007 will add JS for client-side URL updates
+  - Bootstrap 5 `tab-pane` uses `show active` classes to display the active pane — these must be set server-side via Jinja2 when not using BS5 JS
+  - Custom Jinja2 filters (human_size, format_euro, mask_cf) are registered in web/app.py at startup — testing template syntax standalone will fail on these filters
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-003
+- Moved "Persone e cariche" section from a standalone card outside tabs INTO the principale tab pane
+- Placed it inside the pane with a section heading (`<h6 class="text-muted">`) to separate it from the dl fields
+- Removed the standalone cariche card that was outside the main card
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - The dl fields (anagrafica) were already moved into the principale pane during US-002, so US-003 only needed to add the cariche section
+  - Used `<h6 class="text-muted fw-semibold small text-uppercase">` for section headings inside a pane
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-004
+- Moved bilanci table from standalone card outside tabs INTO the `tab-pane#bilanci`
+- Added empty-state message `<p class="text-muted">Nessun dato di bilancio disponibile.</p>` when no data
+- Removed standalone bilanci card from outside the main card
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Empty-state messages must be inside the pane (not conditional on data) so the tab always shows something
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-005
+- Moved allegati table from standalone card outside tabs INTO the `tab-pane#allegati`
+- Added empty-state message `<p class="text-muted">Nessun documento disponibile.</p>` when no data
+- Removed standalone allegati card from outside the main card
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Same pattern as US-004 for bilanci
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-006
+- Added Leaflet map into `tab-pane#mappa` (height 450px, width 100%)
+- Lazy init via `shown.bs.tab` event — prevents Leaflet white tile bug on hidden elements
+- Also inits immediately if mappa tab is already active on page load (direct ?tab=mappa link)
+- Shows `<p class="text-muted">Coordinate non disponibili.</p>` when lat/lon absent
+- Removed standalone "Sede legale — mappa" card from outside the tabs
+- Added Bootstrap 5 JS bundle (needed for data-bs-toggle="tab" and shown.bs.tab event)
+- Changed nav-tabs from plain `<a href="?tab=...">` to `<a data-bs-toggle="tab" href="#slug">` for client-side tab switching
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Bootstrap JS bundle must be loaded BEFORE the Leaflet script (tab events fire on BS JS init)
+  - Map div id changed from `map` to `ente-map` to avoid conflicts
+  - `_mapInit` guard prevents double initialization if event fires multiple times
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-007
+- Added JS listener on `#enteTabs [data-bs-toggle="tab"]` for `shown.bs.tab` event
+- On each tab click, `history.replaceState` updates `?tab=<slug>` in the URL without reload
+- Slug derived from the href attribute of the clicked tab link (strip leading `#`)
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - `e.target.getAttribute('href').replace('#', '')` extracts slug from the `<a>` data-bs-toggle link
+  - `new URL(window.location.href)` + `searchParams.set()` is clean way to update query params
+  - The `shown.bs.tab` listener for replaceState and for Leaflet lazy init both fire on the same event — order matters: replaceState JS is included before Leaflet JS, so they execute in document order
+  - Manual browser verification needed
+---

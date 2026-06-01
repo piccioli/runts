@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Lista Enti — RUNTS CAI{% endblock %}
+{% block title %}Sezioni CAI — RUNTS{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
@@ -8,14 +8,14 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="h4 mb-3">Enti iscritti al RUNTS</h1>
+<h1 class="h4 mb-3">Sezioni CAI</h1>
 
 {# Search / filter form #}
 <form method="get" action="/" class="row g-2 mb-4">
-  <div class="col-12 col-md-4">
+  <div class="col-12 col-md-5">
     <input type="text" name="q" class="form-control" placeholder="Cerca per denominazione…" value="{{ q }}">
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-6 col-md-4">
     <select name="regione" class="form-select">
       <option value="">Tutte le regioni</option>
       {% for r in regioni %}
@@ -23,17 +23,15 @@
       {% endfor %}
     </select>
   </div>
-  <div class="col-6 col-md-3">
-    <select name="sezione_registro" class="form-select">
-      <option value="">Tutte le sezioni</option>
-      {% for s in sezioni %}
-        <option value="{{ s }}" {% if s == sezione_registro %}selected{% endif %}>{{ s }}</option>
-      {% endfor %}
-    </select>
-  </div>
-  <div class="col-12 col-md-2 d-flex gap-2">
+  <div class="col-12 col-md-3 d-flex gap-2">
     <button type="submit" class="btn btn-primary flex-fill">Cerca</button>
     <a href="/" class="btn btn-outline-secondary">Reset</a>
+  </div>
+  <div class="col-12">
+    <div class="form-check">
+      <input class="form-check-input" type="checkbox" name="ets" value="1" id="cb-ets" {% if ets %}checked{% endif %}>
+      <label class="form-check-label" for="cb-ets">Solo sezioni ETS</label>
+    </div>
   </div>
 </form>
 
@@ -43,17 +41,18 @@
 {% else %}
   <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
     <p class="text-muted small mb-0">
-      {{ total }} enti trovati — pagina {{ page }} di {{ total_pages }}
+      {{ total }} sezioni trovate — pagina {{ page }} di {{ total_pages }}
     </p>
     <div class="d-flex gap-2 align-items-center">
       <div class="btn-group btn-group-sm" role="group">
         <button id="btn-lista" type="button" class="btn btn-primary" onclick="showLista()">Lista</button>
         <button id="btn-mappa" type="button" class="btn btn-outline-primary" onclick="showMappa()">Mappa</button>
       </div>
-      <a href="/api/enti.csv?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}"
+      <a href="/api/enti.csv?q={{ q }}&regione={{ regione }}"
          class="btn btn-sm btn-outline-secondary">Esporta CSV</a>
-      <a href="/api/enti.xlsx?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}"
+      <a href="/api/enti.xlsx?q={{ q }}&regione={{ regione }}"
          class="btn btn-sm btn-outline-secondary">Esporta Excel</a>
+      {% if ets %}<span class="badge bg-success align-self-center">Filtro ETS attivo</span>{% endif %}
     </div>
   </div>
 
@@ -63,24 +62,39 @@
       <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
         <thead class="table-light">
           <tr>
+            <th>Codice CAI</th>
             <th>Denominazione</th>
             <th>Comune</th>
             <th>Regione</th>
-            <th>Sezione</th>
           </tr>
         </thead>
         <tbody>
           {% for e in enti %}
-          {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&sezione_registro=" ~ sezione_registro ~ "&page=" ~ page %}
+          {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&page=" ~ page ~ ("&ets=1" if ets else "") %}
           <tr>
+            <td class="text-muted small">{{ e.codice_cai or "—" }}</td>
             <td>
+              {% if e.id_runts %}
               <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
-                {{ e.denominazione }}
+                {{ e.cai_denominazione }}
               </a>
+              {% if e.cai_match_note == 'exact_cf' %}
+              <span class="badge bg-success ms-1" title="Match esatto per codice fiscale">ETS</span>
+              {% elif e.cai_match_note == 'fuzzy_nome' %}
+              <span class="badge bg-success ms-1" title="Match per nome (CF assente nel registro CAI)">ETS</span>
+              <span class="badge bg-warning text-dark ms-1" title="CF non presente nel registro CAI — verificare">⚠ CF mancante CAI</span>
+              {% elif e.cai_match_note and e.cai_match_note.startswith('cf_mismatch') %}
+              <span class="badge bg-success ms-1">ETS</span>
+              <span class="badge bg-danger ms-1" title="{{ e.cai_match_note }}">⚠ CF discordante</span>
+              {% else %}
+              <span class="badge bg-success ms-1">ETS</span>
+              {% endif %}
+              {% else %}
+              {{ e.cai_denominazione }}
+              {% endif %}
             </td>
-            <td>{{ e.sede_comune or "—" }}</td>
-            <td>{{ e.sede_regione or "—" }}</td>
-            <td>{{ e.sezione_registro or "—" }}</td>
+            <td>{{ e.comune or "—" }}</td>
+            <td>{{ e.cai_regione or "—" }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -91,20 +105,21 @@
     {% if total_pages > 1 %}
     <nav>
       <ul class="pagination pagination-sm">
+        {% set ets_param = "&ets=1" if ets else "" %}
         <li class="page-item {% if page == 1 %}disabled{% endif %}">
-          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page - 1 }}">‹</a>
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page - 1 }}{{ ets_param }}">‹</a>
         </li>
         {% for p in range(1, total_pages + 1) %}
           {% if p == page or (p >= page - 2 and p <= page + 2) or p == 1 or p == total_pages %}
             <li class="page-item {% if p == page %}active{% endif %}">
-              <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ p }}">{{ p }}</a>
+              <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ p }}{{ ets_param }}">{{ p }}</a>
             </li>
           {% elif p == page - 3 or p == page + 3 %}
             <li class="page-item disabled"><span class="page-link">…</span></li>
           {% endif %}
         {% endfor %}
         <li class="page-item {% if page == total_pages %}disabled{% endif %}">
-          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&sezione_registro={{ sezione_registro }}&page={{ page + 1 }}">›</a>
+          <a class="page-link" href="/?q={{ q }}&regione={{ regione }}&page={{ page + 1 }}{{ ets_param }}">›</a>
         </li>
       </ul>
     </nav>
@@ -140,13 +155,11 @@
 
     var CURRENT_Q = {{ q | tojson }};
     var CURRENT_REGIONE = {{ regione | tojson }};
-    var CURRENT_SEZIONE = {{ sezione_registro | tojson }};
 
     function buildGeoJsonUrl() {
       var params = new URLSearchParams();
       if (CURRENT_Q) params.set('q', CURRENT_Q);
       if (CURRENT_REGIONE) params.set('regione', CURRENT_REGIONE);
-      if (CURRENT_SEZIONE) params.set('sezione_registro', CURRENT_SEZIONE);
       return '/api/enti.geojson?' + params.toString();
     }
 

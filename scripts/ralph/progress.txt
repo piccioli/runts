@@ -94,3 +94,112 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - The `shown.bs.tab` listener for replaceState and for Leaflet lazy init both fire on the same event — order matters: replaceState JS is included before Leaflet JS, so they execute in document order
   - Manual browser verification needed
 ---
+
+## 2026-06-01 - US-001 (sezioni-cai PRD)
+- Added `CREATE TABLE IF NOT EXISTS sezioni_cai` and `sottosezioni_cai` to `SCHEMA` in `scraper/db.py`
+- Added 3 indices: `idx_sezioni_cai_cf`, `idx_sezioni_cai_regione`, `idx_sottosezioni_cai_sezione`
+- Added both table DDLs and their indices to `_MIGRATIONS` list
+- Implemented `upsert_sezione_cai(conn, data)` and `upsert_sottosezione_cai(conn, data)` using `INSERT OR REPLACE`
+- Files changed: `scraper/db.py`
+- **Learnings for future iterations:**
+  - Both upsert functions follow the same pattern as `upsert_allegato`: detect existing row, return 'inserted'/'updated', use INSERT OR REPLACE
+  - `cai_scraped_at` defaults to `datetime.now()` if not provided in data dict
+  - The `_MIGRATIONS` list is idempotent: uses `IF NOT EXISTS` for tables and indices, so safe to re-run
+---
+
+## 2026-06-01 - US-002 (sezioni-cai PRD)
+- Created `scraper/cai_scraper.py` with `fetch_all_sections() -> list[dict]`
+- Iterates over 20 region slugs, calls GET `https://www.cai.it/wp-json/cai-section/v2/sections-list-simple?region=<regione>` via httpx
+- `_normalize_section(raw, regione)` maps API response fields to DB column names with `cai_` prefix; serializes `officeAddress`/`postalAddress` as `json.dumps()`
+- `_with_retry(fn)` wraps any httpx call with max 3 attempts and exponential backoff (1s, 2s delays)
+- Per-region failures are caught and logged without aborting the full fetch
+- Files changed: `scraper/cai_scraper.py` (new)
+- **Learnings for future iterations:**
+  - Use default-argument capture in nested `def _fetch(r=regione, c=client)` to correctly capture loop variables for retry closures
+  - `httpx.Client` used synchronously (not async) — matches the scraper's sync pattern; suitable since this scraper is not performance-critical
+  - API field names not known until runtime; `_normalize_section` uses fallback `or` chains (e.g. `raw.get("officePhone") or raw.get("office_phone")`) to tolerate naming variations
+---
+
+## 2026-06-01 - US-003 (sezioni-cai PRD)
+- Added `_SUBSECTIONS_URL` constant with `{code}` placeholder in `scraper/cai_scraper.py`
+- Added `_normalize_subsection(raw, codice_sezione)` mapping API fields to sottosezioni_cai columns
+- Added `fetch_subsections(codice_sezione: str) -> list[dict]` with retry, 404 tolerance, and empty-response guard
+- Header `Origin: https://www.cai.it` sent on every request as required by the API
+- Files changed: `scraper/cai_scraper.py`
+- **Learnings for future iterations:**
+  - 404 must be checked BEFORE `raise_for_status()` since httpx would raise on 4xx; check `resp.status_code == 404` first and return `[]`
+  - Wrapping the `httpx.Client` context manager inside the retry-called lambda works cleanly — client is created per `fetch_subsections()` call
+  - Same `_with_retry` helper reused; all exceptions (including httpx errors after max retries) are caught at the outer level and return `[]`
+---
+
+## 2026-06-01 - US-004 (sezioni-cai PRD)
+- Created `scraper/cai_main.py` with argparse: `--db PATH` (default: runts.db), `--verbose`, `--no-subsections`
+- Calls `fetch_all_sections()` then `upsert_sezione_cai()` for every section, tracking inserted/updated/failed counts
+- Without `--no-subsections`, iterates all sections and calls `fetch_subsections(codice)` + `upsert_sottosezione_cai()` for each result
+- Prints a formatted report with section and sub-section counts at the end
+- Executable as `python3 -m scraper.cai_main` (standard `if __name__ == "__main__": main()` pattern)
+- Files changed: `scraper/cai_main.py` (new)
+- **Learnings for future iterations:**
+  - Followed the same sync pattern as `scraper/main.py` — no async needed since `cai_scraper.py` uses httpx synchronously
+  - `init_db()` is called at startup to ensure tables exist before any upsert
+  - Wrapped each upsert in try/except so a single failing record doesn't abort the whole run
+  - `--no-subsections` flag uses `dest="no_subsections"` so it maps to a clean attribute name
+---
+
+## 2026-06-01 - US-005 (sezioni-cai PRD)
+- Changed `enti_list` route in `web/app.py` to query `sezioni_cai` as primary source with `LEFT JOIN enti ON sezioni_cai.cai_codice_fiscale = enti.codice_fiscale`
+- Added `_build_cai_filter_clauses(q, regione)` for sezioni_cai queries; uses `s.cai_denominazione` for `q` and `s.cai_regione` for `regione`
+- Query returns: `codice_cai, cai_denominazione, cai_regione, json_extract(cai_indirizzo_sede, '$.city') AS comune, e.id_runts`
+- Regioni dropdown now populated from `SELECT DISTINCT cai_regione FROM sezioni_cai`
+- Removed `sezione_registro` from list form, pagination links, export links, and JS vars (not applicable to sezioni_cai)
+- Added `_table_exists(conn, "sezioni_cai")` guard with graceful fallback to empty list
+- Updated `list.html`: title, heading, table columns (Denominazione/Comune/Regione), conditional link (only if `id_runts` not null)
+- Files changed: `web/app.py`, `web/templates/list.html`
+- **Learnings for future iterations:**
+  - SQLite's `json_extract(col, '$.field')` works directly in SELECT — no extra function needed
+  - The `_build_filter_clauses` function for `enti` table is kept intact (used by geojson/csv/xlsx API endpoints) — new `_build_cai_filter_clauses` handles sezioni_cai queries
+  - Context dict no longer passes `sezione_registro` or `sezioni` keys — templates referencing these will break; search for them before modifying
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-006 (sezioni-cai PRD)
+- Added "Codice CAI" column (first column) to the list table in `web/templates/list.html`
+- Added `<span class="badge bg-success ms-1">ETS</span>` next to the denomination link when `e.id_runts` is not null
+- Conditional link behavior already existed from US-005; only needed to add badge and new column
+- Files changed: `web/templates/list.html`
+- **Learnings for future iterations:**
+  - `codice_cai` was already returned by the query in app.py (US-005) — no backend changes needed
+  - Badge is placed after the `<a>` tag inside the same `<td>`, not in a separate column
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-007 (sezioni-cai PRD)
+- Added `ets: Optional[int] = None` parameter to `enti_list` route in `web/app.py`
+- When `ets=1`, appends `s.cai_codice_fiscale IS NOT NULL AND e.id_runts IS NOT NULL` to WHERE clauses
+- Passes `ets` (0 or 1) to template context
+- Added checkbox `<input type="checkbox" name="ets" value="1">` in the filter form in `list.html`
+- Added `{% set ets_param %}` variable and propagated `ets` through pagination links and back_url
+- Added visual "Filtro ETS attivo" badge in the toolbar when filter is on
+- Files changed: `web/app.py`, `web/templates/list.html`
+- **Learnings for future iterations:**
+  - HTML checkboxes with `value="1"` submit `ets=1` when checked; when unchecked, the param is absent — FastAPI `Optional[int] = None` handles this cleanly
+  - The ets clause references both `s.cai_codice_fiscale` and `e.id_runts` (joined alias), so it must go AFTER the LEFT JOIN in SQL (the `where_sql` string is placed after the JOIN clause)
+  - Jinja2 `{% set ets_param = "&ets=1" if ets else "" %}` is the cleanest way to conditionally append to URL fragments in pagination
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-008 (sezioni-cai PRD)
+- Added `"sottosezioni"` to `_VALID_TABS` in `web/app.py`
+- Added sottosezioni query in `ente_detail` route: `JOIN enti -> sezioni_cai -> sottosezioni_cai` on `codice_fiscale = cai_codice_fiscale` then `codice_cai = cai_sezione_codice`; uses `json_extract(cai_indirizzo_sede, '$.city')` for comune; guarded by `_table_exists` for both tables
+- Passes `sottosezioni` list to template context
+- Added fifth tab "Sottosezioni" nav-link and tab-pane in `web/templates/detail.html` after Mappa
+- Tab pane shows table with: Nome, Comune, Telefono (sede or fallback), Email, Soci, Anno fondazione
+- Shows `<p class="text-muted">Nessuna sottosezione registrata.</p>` when list is empty
+- Files changed: `web/app.py`, `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - The bridge from enti → sottosezioni requires TWO joins: enti→sezioni_cai (via codice_fiscale/cai_codice_fiscale) then sezioni_cai→sottosezioni_cai (via codice_cai/cai_sezione_codice)
+  - Extracting JSON fields in the SELECT query (`json_extract(ss.cai_indirizzo_sede, '$.city') AS comune`) is cleaner than post-processing in the template; the column becomes accessible via `ss.comune`
+  - Both `sezioni_cai` and `sottosezioni_cai` must be guarded with `_table_exists` since the DB may not have them on first run
+  - `cai_telefono_sede or cai_telefono` fallback in template handles sections that only have one of the two phone fields
+  - Manual browser verification needed (no browser tools)
+---

@@ -104,6 +104,53 @@ CREATE INDEX IF NOT EXISTS idx_allegati_codice_pratica ON allegati(codice_pratic
 CREATE INDEX IF NOT EXISTS idx_bilanci_id_runts ON bilanci(id_runts);
 CREATE INDEX IF NOT EXISTS idx_cariche_id_runts ON cariche_sociali(id_runts);
 CREATE INDEX IF NOT EXISTS idx_cariche_attive ON cariche_sociali(id_runts, valid_to);
+
+CREATE TABLE IF NOT EXISTS sezioni_cai (
+    codice_cai            TEXT PRIMARY KEY,
+    cai_denominazione     TEXT NOT NULL,
+    cai_codice_fiscale    TEXT,
+    cai_partita_iva       TEXT,
+    cai_email             TEXT,
+    cai_pec               TEXT,
+    cai_telefono_sede     TEXT,
+    cai_telefono          TEXT,
+    cai_fax               TEXT,
+    cai_indirizzo_sede    TEXT,
+    cai_indirizzo_postale TEXT,
+    cai_sito_web          TEXT,
+    cai_orari             TEXT,
+    cai_avvisi            TEXT,
+    cai_anno_fondazione   INTEGER,
+    cai_soci_ultimo_anno  INTEGER,
+    cai_lat               REAL,
+    cai_lon               REAL,
+    cai_regione           TEXT NOT NULL,
+    cai_scraped_at        TEXT,
+    cai_match_note        TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sezioni_cai_cf ON sezioni_cai(cai_codice_fiscale);
+CREATE INDEX IF NOT EXISTS idx_sezioni_cai_regione ON sezioni_cai(cai_regione);
+
+CREATE TABLE IF NOT EXISTS sottosezioni_cai (
+    cai_codice          TEXT PRIMARY KEY,
+    cai_sezione_codice  TEXT NOT NULL REFERENCES sezioni_cai(codice_cai),
+    cai_nome            TEXT NOT NULL,
+    cai_email           TEXT,
+    cai_telefono_sede   TEXT,
+    cai_telefono        TEXT,
+    cai_indirizzo_sede  TEXT,
+    cai_sito_web        TEXT,
+    cai_orari           TEXT,
+    cai_avvisi          TEXT,
+    cai_anno_fondazione INTEGER,
+    cai_soci            INTEGER,
+    cai_lat             REAL,
+    cai_lon             REAL,
+    cai_scraped_at      TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sottosezioni_cai_sezione ON sottosezioni_cai(cai_sezione_codice);
 """
 
 _MIGRATIONS = [
@@ -179,6 +226,48 @@ _MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS idx_bilanci_id_runts ON bilanci(id_runts)",
     "CREATE INDEX IF NOT EXISTS idx_cariche_id_runts ON cariche_sociali(id_runts)",
     "CREATE INDEX IF NOT EXISTS idx_cariche_attive ON cariche_sociali(id_runts, valid_to)",
+    """CREATE TABLE IF NOT EXISTS sezioni_cai (
+        codice_cai            TEXT PRIMARY KEY,
+        cai_denominazione     TEXT NOT NULL,
+        cai_codice_fiscale    TEXT,
+        cai_partita_iva       TEXT,
+        cai_email             TEXT,
+        cai_pec               TEXT,
+        cai_telefono_sede     TEXT,
+        cai_telefono          TEXT,
+        cai_fax               TEXT,
+        cai_indirizzo_sede    TEXT,
+        cai_indirizzo_postale TEXT,
+        cai_sito_web          TEXT,
+        cai_orari             TEXT,
+        cai_avvisi            TEXT,
+        cai_anno_fondazione   INTEGER,
+        cai_soci_ultimo_anno  INTEGER,
+        cai_lat               REAL,
+        cai_lon               REAL,
+        cai_regione           TEXT NOT NULL,
+        cai_scraped_at        TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_sezioni_cai_cf ON sezioni_cai(cai_codice_fiscale)",
+    "CREATE INDEX IF NOT EXISTS idx_sezioni_cai_regione ON sezioni_cai(cai_regione)",
+    """CREATE TABLE IF NOT EXISTS sottosezioni_cai (
+        cai_codice          TEXT PRIMARY KEY,
+        cai_sezione_codice  TEXT NOT NULL REFERENCES sezioni_cai(codice_cai),
+        cai_nome            TEXT NOT NULL,
+        cai_email           TEXT,
+        cai_telefono_sede   TEXT,
+        cai_telefono        TEXT,
+        cai_indirizzo_sede  TEXT,
+        cai_sito_web        TEXT,
+        cai_orari           TEXT,
+        cai_avvisi          TEXT,
+        cai_anno_fondazione INTEGER,
+        cai_soci            INTEGER,
+        cai_lat             REAL,
+        cai_lon             REAL,
+        cai_scraped_at      TEXT
+    )""",
+    "CREATE INDEX IF NOT EXISTS idx_sottosezioni_cai_sezione ON sottosezioni_cai(cai_sezione_codice)",
 ]
 
 
@@ -377,3 +466,52 @@ def sync_cariche(conn: sqlite3.Connection, id_runts: str, cariche_new: list[dict
 def get_stats(conn: sqlite3.Connection) -> dict:
     total = conn.execute("SELECT COUNT(*) FROM enti").fetchone()[0]
     return {"total": total}
+
+
+def upsert_sezione_cai(conn: sqlite3.Connection, data: dict) -> str:
+    """Insert or replace a CAI section. Returns 'inserted' or 'updated'."""
+    now = datetime.now(timezone.utc).isoformat()
+    cols = [
+        "codice_cai", "cai_denominazione", "cai_codice_fiscale", "cai_partita_iva",
+        "cai_email", "cai_pec", "cai_telefono_sede", "cai_telefono", "cai_fax",
+        "cai_indirizzo_sede", "cai_indirizzo_postale", "cai_sito_web", "cai_orari",
+        "cai_avvisi", "cai_anno_fondazione", "cai_soci_ultimo_anno",
+        "cai_lat", "cai_lon", "cai_regione", "cai_scraped_at",
+    ]
+    existing = conn.execute(
+        "SELECT codice_cai FROM sezioni_cai WHERE codice_cai = ?", (data.get("codice_cai"),)
+    ).fetchone()
+    action = "updated" if existing else "inserted"
+    row = {c: data.get(c) for c in cols}
+    row["cai_scraped_at"] = row.get("cai_scraped_at") or now
+    conn.execute(
+        f"INSERT OR REPLACE INTO sezioni_cai ({', '.join(cols)}) "
+        f"VALUES ({', '.join(':' + c for c in cols)})",
+        row,
+    )
+    conn.commit()
+    return action
+
+
+def upsert_sottosezione_cai(conn: sqlite3.Connection, data: dict) -> str:
+    """Insert or replace a CAI sub-section. Returns 'inserted' or 'updated'."""
+    now = datetime.now(timezone.utc).isoformat()
+    cols = [
+        "cai_codice", "cai_sezione_codice", "cai_nome", "cai_email",
+        "cai_telefono_sede", "cai_telefono", "cai_indirizzo_sede", "cai_sito_web",
+        "cai_orari", "cai_avvisi", "cai_anno_fondazione", "cai_soci",
+        "cai_lat", "cai_lon", "cai_scraped_at",
+    ]
+    existing = conn.execute(
+        "SELECT cai_codice FROM sottosezioni_cai WHERE cai_codice = ?", (data.get("cai_codice"),)
+    ).fetchone()
+    action = "updated" if existing else "inserted"
+    row = {c: data.get(c) for c in cols}
+    row["cai_scraped_at"] = row.get("cai_scraped_at") or now
+    conn.execute(
+        f"INSERT OR REPLACE INTO sottosezioni_cai ({', '.join(cols)}) "
+        f"VALUES ({', '.join(':' + c for c in cols)})",
+        row,
+    )
+    conn.commit()
+    return action

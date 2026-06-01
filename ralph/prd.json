@@ -1,17 +1,21 @@
 {
   "project": "RUNTS-CAI",
-  "branchName": "ralph/detail-tabs",
-  "description": "Tab Navigation nella Scheda Ente — suddivisione della pagina /ente/<id> in quattro tab: Dati principali, Indicatori di bilancio, Atti e documenti, Mappa. La tab attiva è riflessa nell'URL (?tab=<slug>).",
+  "branchName": "ralph/sezioni-cai",
+  "description": "Integrazione dati CAI — scraping sezioni e sottosezioni da cai.it REST API, nuova lista principale da sezioni_cai, filtro ETS, quinta tab Sottosezioni nella scheda ente.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Backend: route /ente/<id_runts> legge ?tab e passa active_tab al template",
-      "description": "As a developer, I need the backend to read the ?tab query param and pass active_tab to the Jinja2 template so that server-side rendering selects the correct tab on page load.",
+      "title": "Tabelle sezioni_cai e sottosezioni_cai + migration + upsert",
+      "description": "As a developer, I need two database tables to store CAI section and sub-section data so that they can be queried independently and linked by parent code.",
       "acceptanceCriteria": [
-        "In web/app.py, la route GET /ente/{id_runts} legge request.query_params.get('tab', 'principale')",
-        "I valori accettati sono: 'principale', 'bilanci', 'allegati', 'mappa'. Qualsiasi altro valore viene normalizzato a 'principale'",
-        "La variabile active_tab è passata al contesto del template Jinja2",
-        "Il contesto esistente (allegati, bilanci, cariche, lat, lon, ente, ecc.) non viene modificato",
+        "In scraper/db.py, aggiungere CREATE TABLE IF NOT EXISTS sezioni_cai con colonne: codice_cai TEXT PRIMARY KEY, cai_denominazione TEXT NOT NULL, cai_codice_fiscale TEXT, cai_partita_iva TEXT, cai_email TEXT, cai_pec TEXT, cai_telefono_sede TEXT, cai_telefono TEXT, cai_fax TEXT, cai_indirizzo_sede TEXT, cai_indirizzo_postale TEXT, cai_sito_web TEXT, cai_orari TEXT, cai_avvisi TEXT, cai_anno_fondazione INTEGER, cai_soci_ultimo_anno INTEGER, cai_lat REAL, cai_lon REAL, cai_regione TEXT NOT NULL, cai_scraped_at TEXT",
+        "Aggiungere CREATE TABLE IF NOT EXISTS sottosezioni_cai con colonne: cai_codice TEXT PRIMARY KEY, cai_sezione_codice TEXT NOT NULL REFERENCES sezioni_cai(codice_cai), cai_nome TEXT NOT NULL, cai_email TEXT, cai_telefono_sede TEXT, cai_telefono TEXT, cai_indirizzo_sede TEXT, cai_sito_web TEXT, cai_orari TEXT, cai_avvisi TEXT, cai_anno_fondazione INTEGER, cai_soci INTEGER, cai_lat REAL, cai_lon REAL, cai_scraped_at TEXT",
+        "Aggiungere entrambe le migration a _MIGRATIONS con il DDL completo",
+        "Aggiungere indice idx_sezioni_cai_cf su cai_codice_fiscale",
+        "Aggiungere indice idx_sezioni_cai_regione su cai_regione",
+        "Aggiungere indice idx_sottosezioni_cai_sezione su cai_sezione_codice",
+        "Implementare upsert_sezione_cai(conn, data) in scraper/db.py: INSERT OR REPLACE su codice_cai",
+        "Implementare upsert_sottosezione_cai(conn, data) in scraper/db.py: INSERT OR REPLACE su cai_codice",
         "Typecheck passes"
       ],
       "priority": 1,
@@ -20,16 +24,15 @@
     },
     {
       "id": "US-002",
-      "title": "HTML: struttura Bootstrap 5 nav-tabs in detail.html",
-      "description": "As a developer, I need the tab skeleton in detail.html so that the four content panels have a container and navigation.",
+      "title": "scraper/cai_scraper.py — fetch sezioni da REST API per 20 regioni",
+      "description": "As a developer, I need a scraper module that fetches all CAI sections from the cai.it REST API so that the sezioni_cai table is populated.",
       "acceptanceCriteria": [
-        "detail.html contiene un <ul class=\"nav nav-tabs\"> con quattro <li>: Dati principali (slug: principale), Indicatori di bilancio (slug: bilanci), Atti e documenti (slug: allegati), Mappa (slug: mappa)",
-        "Sotto le tab c'è un <div class=\"tab-content\"> con quattro <div class=\"tab-pane\"> con id corrispondenti agli slug",
-        "La tab attiva usa la variabile Jinja2 active_tab per applicare la classe 'active' sia al <li> che al <div class=\"tab-pane\">",
-        "Il pulsante 'Scarica PDF' rimane nell'header della card esterna, sopra il menu tab, invariato",
-        "Il markup usa solo Bootstrap 5 (nessuna libreria aggiuntiva)",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare scraper/cai_scraper.py con funzione fetch_all_sections() -> list[dict]",
+        "La funzione itera su 20 slug regione: ['abruzzo','basilicata','calabria','campania','emilia-romagna','friuli-venezia-giulia','lazio','liguria','lombardia','marche','molise','piemonte','puglia','sardegna','sicilia','toscana','trentino-alto-adige','umbria','valle-d-aosta','veneto']",
+        "Per ogni regione chiama GET https://www.cai.it/wp-json/cai-section/v2/sections-list-simple?region=<regione> con httpx (già in requirements)",
+        "Normalizza il JSON: serializza officeAddress e postalAddress come json.dumps(), mappa tutti i campi API sui nomi colonna DB con prefisso cai_",
+        "Gestisce errori di rete con retry max 3 tentativi e backoff esponenziale",
+        "Typecheck passes"
       ],
       "priority": 2,
       "passes": true,
@@ -37,14 +40,15 @@
     },
     {
       "id": "US-003",
-      "title": "Tab 'Dati principali': sposta contenuto anagrafico nel pane",
-      "description": "As a user, I want to see the core registry data of a section in its own tab so that the page is not cluttered.",
+      "title": "scraper/cai_scraper.py — fetch sottosezioni per ogni sezione",
+      "description": "As a developer, I need the scraper to fetch sub-sections for each CAI section so that the sottosezioni_cai table is populated.",
       "acceptanceCriteria": [
-        "Il pannello tab-pane#principale contiene tutti i campi anagrafici attualmente presenti nella scheda: CF, forma giuridica, sezione registro, data iscrizione, stato, indirizzo sede, CAP, comune, provincia, regione, PEC, sito web, rappresentante legale",
-        "La sezione 'Persone e cariche' (se presente) è inclusa in questo pannello",
-        "Nessuna informazione anagrafica è stata persa rispetto alla versione precedente",
-        "Typecheck passes",
-        "Verify in browser: aprire /ente/83894 e verificare che tutti i campi anagrafici di CAI Pisa siano visibili nel pannello 'Dati principali'"
+        "In scraper/cai_scraper.py, aggiungere funzione fetch_subsections(codice_sezione: str) -> list[dict]",
+        "Chiama GET https://www.cai.it/wp-json/cai-section/v2/sections/{codice_sezione}/sub-sections-list con header Origin: https://www.cai.it",
+        "Se la risposta è vuota o 404, ritorna lista vuota senza errore",
+        "Normalizza la risposta aggiungendo cai_sezione_codice = codice_sezione a ogni record e mappando i campi con prefisso cai_",
+        "Gestisce errori di rete con retry max 3 tentativi e backoff esponenziale",
+        "Typecheck passes"
       ],
       "priority": 3,
       "passes": true,
@@ -52,15 +56,15 @@
     },
     {
       "id": "US-004",
-      "title": "Tab 'Indicatori di bilancio': sposta tabella bilanci nel pane",
-      "description": "As a user, I want to see the financial data isolated in its own tab so that I can focus on the numbers.",
+      "title": "scraper/cai_main.py — CLI entry point con report",
+      "description": "As a developer, I need a runnable CLI entry point for the CAI scraper so that it can be executed from the command line.",
       "acceptanceCriteria": [
-        "Il pannello tab-pane#bilanci contiene la tabella bilanci (anno, totale proventi, totale oneri, risultato) identica a quella attuale",
-        "Se la lista bilanci è vuota, il pannello mostra <p class=\"text-muted\">Nessun dato di bilancio disponibile.</p>",
-        "La tab 'Indicatori di bilancio' è sempre visibile nel menu anche quando non ci sono dati",
-        "La sezione 'Indicatori di bilancio' non appare più fuori dai tab",
-        "Typecheck passes",
-        "Verify in browser: /ente/83894?tab=bilanci mostra i 4 anni di bilancio di CAI Pisa; aprire la scheda di un ente senza bilanci e verificare il messaggio vuoto"
+        "Creare scraper/cai_main.py con argparse: --db PATH (default: runts.db), --verbose, --no-subsections (skip sottosezioni fetch)",
+        "Esegue fetch_all_sections() e upsert_sezione_cai() per ogni record",
+        "Per ogni sezione, chiama fetch_subsections(codice) e upsert_sottosezione_cai() per ogni risultato, salvo --no-subsections",
+        "Stampa report finale: sezioni scaricate, sottosezioni scaricate, inserite, aggiornate, fallite",
+        "Eseguibile come python3 -m scraper.cai_main",
+        "Typecheck passes"
       ],
       "priority": 4,
       "passes": true,
@@ -68,15 +72,15 @@
     },
     {
       "id": "US-005",
-      "title": "Tab 'Atti e documenti': sposta tabella allegati nel pane",
-      "description": "As a user, I want to browse attachments in a dedicated tab so that I don't have to scroll past financial data.",
+      "title": "Lista principale / migrata su sezioni_cai con LEFT JOIN enti",
+      "description": "As a user, I want the main list to show all CAI sections (not just RUNTS entities) so that I have a complete view of the CAI network.",
       "acceptanceCriteria": [
-        "Il pannello tab-pane#allegati contiene la tabella allegati (tipo, codice pratica, anno, dimensione, link download locale, link RUNTS originale) identica a quella attuale",
-        "Se la lista allegati è vuota, il pannello mostra <p class=\"text-muted\">Nessun documento disponibile.</p>",
-        "La tab 'Atti e documenti' è sempre visibile nel menu anche quando non ci sono allegati",
-        "La sezione 'Atti e documenti' non appare più fuori dai tab",
+        "In web/app.py, la route GET / fa SELECT su sezioni_cai come sorgente principale con LEFT JOIN enti ON sezioni_cai.cai_codice_fiscale = enti.codice_fiscale",
+        "Le colonne restituite sono: codice_cai, cai_denominazione, cai_regione, comune (estratto da cai_indirizzo_sede JSON campo city), id_runts (NULL se no match RUNTS)",
+        "Il filtro regione usa cai_regione invece di sede_regione",
+        "La paginazione LIMIT/OFFSET funziona correttamente",
         "Typecheck passes",
-        "Verify in browser: /ente/61826?tab=allegati mostra gli allegati di CAI Parma; aprire la scheda di un ente senza allegati e verificare il messaggio vuoto"
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 5,
       "passes": true,
@@ -84,17 +88,14 @@
     },
     {
       "id": "US-006",
-      "title": "Tab 'Mappa': mappa Leaflet full-width con lazy init",
-      "description": "As a user, I want to see a full-width map of the section's headquarters in its own tab so that I can orient myself geographically.",
+      "title": "Colonna codice CAI + badge ETS nella lista",
+      "description": "As a user, I want to see the CAI section code and an ETS badge in the list so that I can identify sections at a glance.",
       "acceptanceCriteria": [
-        "Il pannello tab-pane#mappa contiene una mappa Leaflet larga 100% del contenitore e alta 450px",
-        "La mappa mostra un marker sul pin della sede dell'ente",
-        "La mappa viene inizializzata solo quando la tab 'Mappa' diventa visibile per la prima volta (lazy init tramite evento shown.bs.tab di Bootstrap), per evitare il bug di tile bianchi di Leaflet su elementi display:none",
-        "Se lat o lon sono assenti o null, il pannello mostra <p class=\"text-muted\">Coordinate non disponibili.</p> al posto della mappa",
-        "La vecchia sezione 'Sede legale — mappa' (precedentemente sotto l'anagrafica, fuori dai tab) viene rimossa dal template",
-        "La tab 'Mappa' è sempre visibile nel menu",
+        "Ogni riga della lista mostra codice_cai in una colonna dedicata",
+        "Le righe con id_runts non null mostrano un badge <span class=\"badge bg-success\">ETS</span>",
+        "Il link /ente/<id_runts> è presente solo se id_runts è non null; le righe senza match RUNTS mostrano solo il testo della denominazione",
         "Typecheck passes",
-        "Verify in browser: aprire /ente/83894?tab=mappa e verificare che il pin di CAI Pisa sia centrato correttamente senza tile bianchi"
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 6,
       "passes": true,
@@ -102,17 +103,35 @@
     },
     {
       "id": "US-007",
-      "title": "JavaScript: aggiorna URL con history.replaceState al click sul tab",
-      "description": "As a user, I want the URL to reflect the active tab so that I can copy and share a direct link to a specific section.",
+      "title": "Filtro ?ets=1 Solo sezioni ETS nella lista",
+      "description": "As a user, I want to filter the list to show only sections registered on RUNTS so that I can focus on ETS entities.",
       "acceptanceCriteria": [
-        "Cliccando su qualsiasi tab, il JavaScript chiama history.replaceState per aggiornare la query string ?tab=<slug> senza ricaricare la pagina",
-        "Lo slug usato corrisponde all'id del pannello: principale, bilanci, allegati, mappa",
-        "Aprire /ente/83894, cliccare 'Mappa', l'URL diventa /ente/83894?tab=mappa",
-        "Aprire /ente/83894?tab=bilanci direttamente apre la tab bilanci (già gestito lato server da US-001, questo story aggiunge solo il comportamento client-side al click)",
+        "Aggiungere checkbox o toggle 'Solo sezioni ETS' nella barra filtri della lista",
+        "Quando attivo, la query aggiunge WHERE cai_codice_fiscale IS NOT NULL AND enti.id_runts IS NOT NULL",
+        "Il filtro si riflette nell'URL (?ets=1) e persiste tra le pagine",
+        "Il contatore totale si aggiorna in base al filtro attivo",
         "Typecheck passes",
-        "Verify in browser: cliccare su ciascuna delle 4 tab e verificare che l'URL cambi correttamente"
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Scheda ente: quinta tab Sottosezioni",
+      "description": "As a user, I want a dedicated tab for sub-sections on the section detail page so that I can see all local groups belonging to this section.",
+      "acceptanceCriteria": [
+        "In web/app.py, la route GET /ente/{id_runts} recupera le sottosezioni tramite JOIN sezioni_cai -> sottosezioni_cai su codice_cai = cai_sezione_codice, usando cai_codice_fiscale come ponte con enti.codice_fiscale; passa lista sottosezioni ordinata per cai_nome",
+        "In web/app.py, aggiungere 'sottosezioni' a _VALID_TABS",
+        "In web/templates/detail.html, aggiungere quinta tab 'Sottosezioni' (slug: sottosezioni) al nav-tabs dopo 'Mappa'",
+        "Il pannello tab-pane#sottosezioni mostra tabella con colonne: Nome, Comune (da cai_indirizzo_sede JSON campo city), Telefono, Email, Soci, Anno fondazione",
+        "Se sottosezioni è lista vuota, mostra <p class=\"text-muted\">Nessuna sottosezione registrata.</p>",
+        "La tab e' sempre visibile nel menu",
+        "Typecheck passes",
+        "Verify in browser: aprire scheda sezione CAI Bergamo (cai_codice_fiscale 80004970168) tab Sottosezioni -> mostra 30 sottosezioni; aprire CAI Pisa -> mostra messaggio vuoto"
+      ],
+      "priority": 8,
       "passes": true,
       "notes": ""
     }
