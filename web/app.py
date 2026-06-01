@@ -105,6 +105,31 @@ def _build_filter_clauses(
     return clauses, params
 
 
+def _build_cai_filter_clauses(
+    q: Optional[str],
+    regione: Optional[str],
+) -> tuple[list[str], list]:
+    """Return (where_clauses, params) for sezioni_cai queries (alias prefix 's.')."""
+    clauses: list[str] = []
+    params: list = []
+
+    if q:
+        clauses.append("s.cai_denominazione LIKE ?")
+        params.append(f"%{q}%")
+
+    if regione:
+        values = [v.strip() for v in regione.split(",") if v.strip()]
+        if len(values) == 1:
+            clauses.append("s.cai_regione = ?")
+            params.append(values[0])
+        elif values:
+            placeholders = ",".join("?" * len(values))
+            clauses.append(f"s.cai_regione IN ({placeholders})")
+            params.extend(values)
+
+    return clauses, params
+
+
 @app.get("/", response_class=HTMLResponse)
 async def enti_list(
     request: Request,
@@ -116,34 +141,41 @@ async def enti_list(
     if not _db_exists():
         return _tr(request, "list.html", {
             "enti": [], "total": 0, "page": 1, "total_pages": 0,
-            "q": "", "regione": "", "sezione_registro": "",
-            "regioni": [], "sezioni": [],
+            "q": "", "regione": "", "regioni": [],
         })
 
     conn = get_db()
     try:
-        clauses, params = _build_filter_clauses(q, regione, sezione_registro)
+        if not _table_exists(conn, "sezioni_cai"):
+            return _tr(request, "list.html", {
+                "enti": [], "total": 0, "page": 1, "total_pages": 0,
+                "q": q or "", "regione": regione or "", "regioni": [],
+            })
+
+        clauses, params = _build_cai_filter_clauses(q, regione)
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
-        total = conn.execute(f"SELECT COUNT(*) FROM enti {where_sql}", params).fetchone()[0]
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM sezioni_cai s "
+            f"LEFT JOIN enti e ON s.cai_codice_fiscale = e.codice_fiscale {where_sql}",
+            params,
+        ).fetchone()[0]
         total_pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
         page = max(1, min(page, total_pages))
         offset = (page - 1) * PAGE_SIZE
 
         enti = conn.execute(
-            f"SELECT id_runts, denominazione, sede_comune, sede_regione, sezione_registro, lat, lon "
-            f"FROM enti {where_sql} ORDER BY denominazione LIMIT ? OFFSET ?",
+            f"SELECT s.codice_cai, s.cai_denominazione, s.cai_regione, "
+            f"json_extract(s.cai_indirizzo_sede, '$.city') AS comune, e.id_runts "
+            f"FROM sezioni_cai s "
+            f"LEFT JOIN enti e ON s.cai_codice_fiscale = e.codice_fiscale "
+            f"{where_sql} ORDER BY s.cai_denominazione LIMIT ? OFFSET ?",
             params + [PAGE_SIZE, offset],
         ).fetchall()
 
         regioni = [
             r[0] for r in conn.execute(
-                "SELECT DISTINCT sede_regione FROM enti WHERE sede_regione IS NOT NULL ORDER BY sede_regione"
-            ).fetchall()
-        ]
-        sezioni = [
-            r[0] for r in conn.execute(
-                "SELECT DISTINCT sezione_registro FROM enti WHERE sezione_registro IS NOT NULL ORDER BY sezione_registro"
+                "SELECT DISTINCT cai_regione FROM sezioni_cai WHERE cai_regione IS NOT NULL ORDER BY cai_regione"
             ).fetchall()
         ]
     finally:
@@ -156,9 +188,7 @@ async def enti_list(
         "total_pages": total_pages,
         "q": q or "",
         "regione": regione or "",
-        "sezione_registro": sezione_registro or "",
         "regioni": regioni,
-        "sezioni": sezioni,
     })
 
 
