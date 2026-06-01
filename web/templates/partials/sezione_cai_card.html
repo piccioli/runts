@@ -9,75 +9,61 @@
   <dt class="col-sm-3">Regione</dt>
   <dd class="col-sm-9">{{ s.cai_regione or '—' }}</dd>
 
-  {% if s.cai_codice_fiscale %}
   <dt class="col-sm-3">Codice fiscale CAI</dt>
-  <dd class="col-sm-9 font-monospace">{{ s.cai_codice_fiscale }}</dd>
-  {% endif %}
+  <dd class="col-sm-9 font-monospace">{{ s.cai_codice_fiscale or '—' }}</dd>
 
-  {% if s.cai_partita_iva %}
   <dt class="col-sm-3">Partita IVA</dt>
-  <dd class="col-sm-9 font-monospace">{{ s.cai_partita_iva }}</dd>
-  {% endif %}
+  <dd class="col-sm-9 font-monospace">{{ s.cai_partita_iva or '—' }}</dd>
 
-  {% if s.cai_email %}
   <dt class="col-sm-3">Email</dt>
-  <dd class="col-sm-9"><a href="mailto:{{ s.cai_email }}">{{ s.cai_email }}</a></dd>
-  {% endif %}
+  <dd class="col-sm-9">
+    {% if s.cai_email %}<a href="mailto:{{ s.cai_email }}">{{ s.cai_email }}</a>{% else %}—{% endif %}
+  </dd>
 
-  {% if s.cai_pec %}
   <dt class="col-sm-3">PEC</dt>
-  <dd class="col-sm-9"><a href="mailto:{{ s.cai_pec }}">{{ s.cai_pec }}</a></dd>
-  {% endif %}
+  <dd class="col-sm-9">
+    {% if s.cai_pec %}<a href="mailto:{{ s.cai_pec }}">{{ s.cai_pec }}</a>{% else %}—{% endif %}
+  </dd>
 
-  {% if s.cai_telefono_sede %}
   <dt class="col-sm-3">Tel. sede</dt>
-  <dd class="col-sm-9">{{ s.cai_telefono_sede }}</dd>
-  {% endif %}
+  <dd class="col-sm-9">{{ s.cai_telefono_sede or '—' }}</dd>
 
-  {% if s.cai_telefono %}
   <dt class="col-sm-3">Telefono</dt>
-  <dd class="col-sm-9">{{ s.cai_telefono }}</dd>
-  {% endif %}
+  <dd class="col-sm-9">{{ s.cai_telefono or '—' }}</dd>
 
-  {% if s.cai_fax %}
   <dt class="col-sm-3">Fax</dt>
-  <dd class="col-sm-9">{{ s.cai_fax }}</dd>
-  {% endif %}
+  <dd class="col-sm-9">{{ s.cai_fax or '—' }}</dd>
 
-  {% if s.cai_indirizzo_sede_parsed %}
   <dt class="col-sm-3">Indirizzo sede</dt>
   <dd class="col-sm-9">
-    {{ s.cai_indirizzo_sede_parsed.get('address1','') }}
-    {% if s.cai_indirizzo_sede_parsed.get('number') %} {{ s.cai_indirizzo_sede_parsed.number }}{% endif %}
-    — {{ s.cai_indirizzo_sede_parsed.get('zip','') }} {{ s.cai_indirizzo_sede_parsed.get('city','') }}
-    ({{ s.cai_indirizzo_sede_parsed.get('province','') }})
+    {% if s.cai_indirizzo_sede_parsed %}
+      {{ s.cai_indirizzo_sede_parsed.get('address1','') }}
+      {% if s.cai_indirizzo_sede_parsed.get('number') %} {{ s.cai_indirizzo_sede_parsed.number }}{% endif %}
+      — {{ s.cai_indirizzo_sede_parsed.get('zip','') }} {{ s.cai_indirizzo_sede_parsed.get('city','') }}
+      ({{ s.cai_indirizzo_sede_parsed.get('province','') }})
+    {% else %}—{% endif %}
   </dd>
-  {% endif %}
 
-  {% if s.cai_sito_web %}
   <dt class="col-sm-3">Sito web</dt>
-  <dd class="col-sm-9"><a href="https://{{ s.cai_sito_web }}" target="_blank" rel="noopener">{{ s.cai_sito_web }}</a></dd>
-  {% endif %}
+  <dd class="col-sm-9">
+    {% if s.cai_sito_web %}<a href="https://{{ s.cai_sito_web }}" target="_blank" rel="noopener">{{ s.cai_sito_web }}</a>{% else %}—{% endif %}
+  </dd>
 
-  {% if s.cai_anno_fondazione %}
   <dt class="col-sm-3">Anno fondazione</dt>
-  <dd class="col-sm-9">{{ s.cai_anno_fondazione }}</dd>
-  {% endif %}
+  <dd class="col-sm-9">{{ s.cai_anno_fondazione or '—' }}</dd>
 
-  {% if s.cai_soci_ultimo_anno %}
   <dt class="col-sm-3">Soci (ultimo anno)</dt>
-  <dd class="col-sm-9">{{ "{:,}".format(s.cai_soci_ultimo_anno).replace(',','.') }}</dd>
-  {% endif %}
+  <dd class="col-sm-9">
+    {% if s.cai_soci_ultimo_anno %}{{ "{:,}".format(s.cai_soci_ultimo_anno).replace(',','.') }}{% else %}—{% endif %}
+  </dd>
 
-  {% if s.cai_orari %}
   <dt class="col-sm-3">Orari</dt>
-  <dd class="col-sm-9 small">{{ s.cai_orari | safe }}</dd>
-  {% endif %}
+  <dd class="col-sm-9 small">{{ s.cai_orari | safe if s.cai_orari else '—' }}</dd>
 
-  {% if s.cai_lat and s.cai_lon %}
   <dt class="col-sm-3">Coordinate CAI</dt>
-  <dd class="col-sm-9 font-monospace small">{{ s.cai_lat }}, {{ s.cai_lon }}</dd>
-  {% endif %}
+  <dd class="col-sm-9 font-monospace small">
+    {% if s.cai_lat and s.cai_lon %}{{ s.cai_lat }}, {{ s.cai_lon }}{% else %}—{% endif %}
+  </dd>
 
   {% if s.cai_match_note and s.cai_match_note != 'exact_cf' %}
   <dt class="col-sm-3">Qualità match</dt>
