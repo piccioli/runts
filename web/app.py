@@ -361,16 +361,50 @@ async def gr_detail(request: Request, gr_codice: str, back: Optional[str] = None
 
 @app.get("/stats", response_class=HTMLResponse)
 async def stats(request: Request):
-    counts = {"sezioni_cai": 0, "enti": 0, "allegati": 0, "bilanci": 0}
+    kpi: dict = {
+        "sezioni_totali": 0,
+        "soci_totali": 0,
+        "enti_ets": 0,
+        "ets_agganciati": 0,
+        "gr_totali": 21,
+        "gr_agganciati": 0,
+        "bilanci_analizzati": 0,
+        "copertura_bilanci_pct": 0.0,
+    }
     if _db_exists():
         conn = get_db()
         try:
-            for table in counts:
-                if _table_exists(conn, table):
-                    counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            if _table_exists(conn, "sezioni_cai"):
+                kpi["sezioni_totali"] = conn.execute("SELECT COUNT(*) FROM sezioni_cai").fetchone()[0]
+                kpi["soci_totali"] = conn.execute(
+                    "SELECT COALESCE(SUM(cai_soci_ultimo_anno), 0) FROM sezioni_cai"
+                ).fetchone()[0]
+            if _table_exists(conn, "enti"):
+                kpi["enti_ets"] = conn.execute("SELECT COUNT(*) FROM enti").fetchone()[0]
+            if _table_exists(conn, "enti") and _table_exists(conn, "sezioni_cai"):
+                kpi["ets_agganciati"] = conn.execute(
+                    "SELECT COUNT(*) FROM enti e "
+                    "JOIN sezioni_cai s ON e.codice_fiscale = s.cai_codice_fiscale"
+                ).fetchone()[0]
+            if _table_exists(conn, "gruppi_regionali_cai"):
+                kpi["gr_totali"] = conn.execute(
+                    "SELECT COUNT(*) FROM gruppi_regionali_cai"
+                ).fetchone()[0]
+                kpi["gr_agganciati"] = conn.execute(
+                    "SELECT COUNT(*) FROM gruppi_regionali_cai WHERE gr_id_runts IS NOT NULL"
+                ).fetchone()[0]
+            if _table_exists(conn, "bilanci"):
+                kpi["bilanci_analizzati"] = conn.execute(
+                    "SELECT COUNT(*) FROM bilanci"
+                ).fetchone()[0]
+                if kpi["enti_ets"] > 0:
+                    enti_con_bilanci = conn.execute(
+                        "SELECT COUNT(DISTINCT id_runts) FROM bilanci"
+                    ).fetchone()[0]
+                    kpi["copertura_bilanci_pct"] = round(enti_con_bilanci / kpi["enti_ets"] * 100, 1)
         finally:
             conn.close()
-    return _tr(request, "stats.html", {"counts": counts, "active_page": "stats"})
+    return _tr(request, "stats.html", {"kpi": kpi, "active_page": "stats"})
 
 
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
