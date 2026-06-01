@@ -143,6 +143,7 @@ async def enti_list(
         return _tr(request, "list.html", {
             "enti": [], "total": 0, "page": 1, "total_pages": 0,
             "q": "", "regione": "", "regioni": [], "ets": 0,
+            "active_page": "sezioni",
         })
 
     conn = get_db()
@@ -151,6 +152,7 @@ async def enti_list(
             return _tr(request, "list.html", {
                 "enti": [], "total": 0, "page": 1, "total_pages": 0,
                 "q": q or "", "regione": regione or "", "regioni": [], "ets": 0,
+                "active_page": "sezioni",
             })
 
         clauses, params = _build_cai_filter_clauses(q, regione)
@@ -193,6 +195,7 @@ async def enti_list(
         "regione": regione or "",
         "regioni": regioni,
         "ets": 1 if ets else 0,
+        "active_page": "sezioni",
     })
 
 
