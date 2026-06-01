@@ -1,0 +1,21 @@
+## Codebase Patterns
+- Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
+- FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
+- No mypy installed in the venv; typecheck = syntax OK + pytest passing
+- `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
+- SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
+
+# Ralph Progress Log
+Started: Lun  1 Giu 2026 14:09:49 CEST
+---
+
+## 2026-06-01 - US-001
+- Added `_VALID_TABS` set and `active_tab` logic to `ente_detail` route in `web/app.py`
+- Reads `request.query_params.get("tab", "principale")`, normalizes unknown values to "principale"
+- Passes `active_tab` to template context alongside all existing context vars
+- Files changed: `web/app.py`
+- **Learnings for future iterations:**
+  - The pre-commit hook runs pytest automatically — no need to manually run tests before committing
+  - FastAPI query params can be read via `request.query_params.get()` without declaring them in the function signature
+  - The template context dict is the third positional arg to `_tr()`
+---
