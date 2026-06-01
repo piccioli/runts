@@ -212,6 +212,45 @@ async def enti_list(
 _VALID_TABS = {"principale", "bilanci", "allegati", "mappa", "sottosezioni"}
 
 
+@app.get("/ets", response_class=HTMLResponse)
+async def ets_list(request: Request):
+    if not _db_exists():
+        return _tr(request, "ets.html", {
+            "enti": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+            "active_page": "ets",
+        })
+
+    conn = get_db()
+    try:
+        if not _table_exists(conn, "enti") or not _table_exists(conn, "sezioni_cai"):
+            return _tr(request, "ets.html", {
+                "enti": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+                "active_page": "ets",
+            })
+
+        enti = conn.execute(
+            "SELECT e.id_runts, e.denominazione, e.sede_comune, e.sede_regione, "
+            "s.codice_cai, s.cai_match_note "
+            "FROM enti e "
+            "LEFT JOIN sezioni_cai s ON e.codice_fiscale = s.cai_codice_fiscale "
+            "ORDER BY (CASE WHEN s.codice_cai IS NULL THEN 0 ELSE 1 END), e.denominazione"
+        ).fetchall()
+
+        total = len(enti)
+        agganciati = sum(1 for r in enti if r["codice_cai"] is not None)
+        non_agganciati = total - agganciati
+    finally:
+        conn.close()
+
+    return _tr(request, "ets.html", {
+        "enti": enti,
+        "total": total,
+        "agganciati": agganciati,
+        "non_agganciati": non_agganciati,
+        "active_page": "ets",
+    })
+
+
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
 async def ente_detail(request: Request, id_runts: str, back: Optional[str] = None):
     if not _db_exists():
