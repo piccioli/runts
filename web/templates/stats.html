@@ -15,155 +15,254 @@ var qualitaDati = {{ qualita_dati | tojson }};
 </script>
 {% endblock %}
 {% block content %}
-<h1 class="h3 mb-4">Statistiche</h1>
+<h1 class="h3 mb-3">Statistiche</h1>
 
-<div class="row g-3 mb-5">
-  <div class="col-sm-6 col-lg">
+{# KPI sempre visibili sopra i tab #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-primary">{{ kpi.sezioni_totali }}</div>
-        <div class="card-text text-muted mt-1">Sezioni CAI</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-primary">{{ kpi.sezioni_totali }}</div>
+        <div class="small text-muted">Sezioni CAI</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-primary">{{ "{:,}".format(kpi.soci_totali).replace(",", ".") }}</div>
-        <div class="card-text text-muted mt-1">Soci totali</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-primary">{{ "{:,}".format(kpi.soci_totali).replace(",",".") }}</div>
+        <div class="small text-muted">Soci totali</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-success">{{ kpi.enti_ets }}</div>
-        <div class="card-text text-muted mt-1">Enti ETS</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-success">{{ kpi.enti_ets }}</div>
+        <div class="small text-muted">Enti ETS</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-success">
-          {{ kpi.ets_agganciati }}
-          <span class="fs-6 text-muted fw-normal">/{{ kpi.enti_ets }}</span>
-        </div>
-        <div class="card-text text-muted mt-1">ETS agganciati</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-success">{{ kpi.ets_agganciati }}<span class="fs-6 text-muted fw-normal">/{{ kpi.enti_ets }}</span></div>
+        <div class="small text-muted">ETS agganciati CAI</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-info">
-          {{ kpi.gr_agganciati }}
-          <span class="fs-6 text-muted fw-normal">/{{ kpi.gr_totali }}</span>
-        </div>
-        <div class="card-text text-muted mt-1">GR agganciati</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-info">{{ kpi.gr_agganciati }}<span class="fs-6 text-muted fw-normal">/{{ kpi.gr_totali }}</span></div>
+        <div class="small text-muted">GR agganciati</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-warning">{{ kpi.bilanci_analizzati }}</div>
-        <div class="card-text text-muted mt-1">Bilanci analizzati</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-warning">{{ kpi.bilanci_analizzati }}</div>
+        <div class="small text-muted">Bilanci analizzati</div>
       </div>
     </div>
   </div>
-  <div class="col-sm-6 col-lg">
+  <div class="col-6 col-sm-4 col-lg">
     <div class="card text-center h-100">
-      <div class="card-body">
-        <div class="display-6 fw-bold text-warning">{{ kpi.copertura_bilanci_pct }}%</div>
-        <div class="card-text text-muted mt-1">Copertura bilanci</div>
+      <div class="card-body py-2">
+        <div class="fs-3 fw-bold text-warning">{{ kpi.copertura_bilanci_pct }}%</div>
+        <div class="small text-muted">Copertura bilanci</div>
       </div>
     </div>
   </div>
 </div>
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Soci per regione</div>
-  <div class="card-body">
+{# Tab navigation #}
+<ul class="nav nav-tabs mb-0" id="statsTabs">
+  <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-mappa" id="t-mappa">Mappa</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-soci" id="t-soci">Soci per regione</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-top10soci" id="t-top10soci">Top 10 soci</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-copertura" id="t-copertura">Copertura ETS</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-proventi" id="t-proventi">Proventi 2024</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-evoluzione" id="t-evoluzione">Evoluzione proventi</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-allegati" id="t-allegati">Allegati</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-sottosezioni" id="t-sottosezioni">Sottosezioni</a></li>
+  <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-qualita" id="t-qualita">Qualità dati</a></li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+
+  {# Mappa #}
+  <div class="tab-pane show active" id="tab-mappa">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Sezioni CAI per regione</h6>
+    <div id="map-regioni" style="height:460px"></div>
+  </div>
+
+  {# Soci per regione #}
+  <div class="tab-pane" id="tab-soci">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Soci per regione</h6>
     <canvas id="chart-soci-regione" height="300"></canvas>
   </div>
-</div>
 
-<script>
-(function() {
-  if (!sociRegione.length) return;
-  var labels = sociRegione.map(function(r) { return r.cai_regione; });
-  var data = sociRegione.map(function(r) { return r.soci; });
-  new Chart(document.getElementById('chart-soci-regione'), {
-    type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        data: data,
-        backgroundColor: 'rgba(13,110,253,0.7)',
-        borderWidth: 0
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              var r = sociRegione[ctx.dataIndex];
-              return r.soci.toLocaleString('it-IT') + ' soci — ' + r.n_sezioni + ' sezioni';
-            }
-          }
-        }
-      },
-      scales: { x: { beginAtZero: true } }
-    }
-  });
-})();
-</script>
-
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Top 10 sezioni per numero soci</div>
-  <div class="card-body p-0">
-    <table class="table table-sm mb-0">
-      <thead><tr><th>#</th><th>Denominazione</th><th>Soci</th><th style="min-width:120px">Barra</th></tr></thead>
+  {# Top 10 soci #}
+  <div class="tab-pane" id="tab-top10soci">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Top 10 sezioni per numero soci</h6>
+    <table class="table table-sm">
+      <thead><tr><th>#</th><th>Denominazione</th><th>Soci</th><th style="min-width:140px">Barra</th></tr></thead>
       <tbody id="tbody-top10-soci"></tbody>
     </table>
   </div>
-</div>
-<script>
-(function() {
-  var MAX_SOCI = 28992;
-  var tbody = document.getElementById('tbody-top10-soci');
-  top10Soci.forEach(function(r, i) {
-    var pct = Math.round(r.cai_soci_ultimo_anno / MAX_SOCI * 100);
-    tbody.insertAdjacentHTML('beforeend',
-      '<tr>' +
-      '<td>' + (i+1) + '</td>' +
-      '<td><a href="/sezione/' + r.codice_cai + '">' + r.cai_denominazione + '</a></td>' +
-      '<td>' + r.cai_soci_ultimo_anno.toLocaleString('it-IT') + '</td>' +
-      '<td><div class="progress" style="height:8px"><div class="progress-bar" style="width:' + pct + '%"></div></div></td>' +
-      '</tr>'
-    );
-  });
-})();
-</script>
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Copertura dati ETS</div>
-  <div class="card-body">
+  {# Copertura ETS #}
+  <div class="tab-pane" id="tab-copertura">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Copertura dati ETS</h6>
     <div id="copertura-rows"></div>
   </div>
+
+  {# Proventi 2024 #}
+  <div class="tab-pane" id="tab-proventi">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Proventi ETS 2024 per regione</h6>
+    <canvas id="chart-proventi-regione"></canvas>
+    <p class="text-muted small mt-2 mb-0">Dati parziali — solo enti con bilancio 2024 analizzato</p>
+  </div>
+
+  {# Evoluzione proventi #}
+  <div class="tab-pane" id="tab-evoluzione">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Evoluzione proventi nel tempo</h6>
+    <div class="mb-3">
+      <select id="sel-ente" class="form-select form-select-sm w-auto"></select>
+    </div>
+    <canvas id="chart-proventi-tempo"></canvas>
+  </div>
+
+  {# Allegati #}
+  <div class="tab-pane" id="tab-allegati">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Distribuzione allegati per tipo</h6>
+    <div style="max-width:500px;margin:auto">
+      <canvas id="chart-allegati-tipo"></canvas>
+    </div>
+  </div>
+
+  {# Sottosezioni #}
+  <div class="tab-pane" id="tab-sottosezioni">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Sezioni con più sottosezioni</h6>
+    <table class="table table-sm">
+      <thead><tr><th>#</th><th>Denominazione</th><th>Sottosezioni</th><th style="min-width:140px">Barra</th></tr></thead>
+      <tbody id="tbody-top10-sottosezioni"></tbody>
+    </table>
+  </div>
+
+  {# Qualità dati #}
+  <div class="tab-pane" id="tab-qualita">
+    <h6 class="text-muted fw-semibold small text-uppercase mb-3">Qualità dati</h6>
+    <table class="table table-sm">
+      <thead><tr><th>Problema</th><th>N. elementi</th><th>Azione</th></tr></thead>
+      <tbody id="tbody-qualita"></tbody>
+    </table>
+  </div>
+
 </div>
+
 <script>
-(function() {
+// ── Lazy init: init each section only once when its tab is shown ──────────────
+var _inited = {};
+function lazyInit(tabId, fn) {
+  document.getElementById('statsTabs').querySelectorAll('[data-bs-toggle="tab"]').forEach(function(el) {
+    if (el.getAttribute('href') === '#' + tabId) {
+      el.addEventListener('shown.bs.tab', function() {
+        if (!_inited[tabId]) { _inited[tabId] = true; fn(); }
+      });
+    }
+  });
+}
+
+// ── Mappa D3 (init on load since it's the first active tab) ──────────────────
+(function initMappa() {
+  var NORM = {
+    "Valle d'Aosta": "VALLE D'AOSTA",
+    "Trentino-Alto Adige": "TRENTINO-ALTO ADIGE",
+    "Friuli Venezia Giulia": "FRIULI-VENEZIA GIULIA",
+    "Emilia-Romagna": "EMILIA-ROMAGNA"
+  };
+  function normName(n) { return NORM[n] || n.toUpperCase(); }
+  var lookup = {};
+  sociRegione.forEach(function(r) { lookup[r.cai_regione] = r; });
+  var container = document.getElementById('map-regioni');
+  var W = container.offsetWidth || 700, H = 460;
+  var svg = d3.select('#map-regioni').append('svg')
+    .attr('width','100%').attr('height', H)
+    .attr('viewBox','0 0 ' + W + ' ' + H);
+  var maxSezioni = d3.max(sociRegione, function(r) { return r.n_sezioni; }) || 1;
+  var color = d3.scaleSequential(d3.interpolateBlues).domain([0, maxSezioni]);
+  var projection = d3.geoMercator();
+  var path = d3.geoPath().projection(projection);
+  var tip = d3.select('body').append('div')
+    .style('position','absolute').style('background','rgba(0,0,0,0.75)')
+    .style('color','#fff').style('padding','6px 10px').style('border-radius','4px')
+    .style('font-size','13px').style('pointer-events','none').style('display','none');
+  d3.json('/static/it-regions.geojson').then(function(geo) {
+    projection.fitSize([W, H], geo);
+    svg.selectAll('path').data(geo.features).enter().append('path')
+      .attr('d', path).attr('stroke','#fff').attr('stroke-width', 0.5)
+      .attr('fill', function(d) {
+        var row = lookup[normName(d.properties.name)];
+        return row ? color(row.n_sezioni) : '#eee';
+      })
+      .on('mouseover', function(event, d) {
+        var row = lookup[normName(d.properties.name)];
+        var html = '<strong>' + d.properties.name + '</strong>';
+        if (row) html += '<br>' + row.n_sezioni + ' sezioni — ' + row.soci.toLocaleString('it-IT') + ' soci';
+        else html += '<br>Nessun dato';
+        tip.style('display','block').html(html);
+      })
+      .on('mousemove', function(event) {
+        tip.style('left',(event.pageX+12)+'px').style('top',(event.pageY-28)+'px');
+      })
+      .on('mouseout', function() { tip.style('display','none'); });
+  });
+})();
+
+// ── Soci per regione ──────────────────────────────────────────────────────────
+lazyInit('tab-soci', function() {
+  var labels = sociRegione.map(function(r) { return r.cai_regione; });
+  var data   = sociRegione.map(function(r) { return r.soci; });
+  new Chart(document.getElementById('chart-soci-regione'), {
+    type: 'bar',
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: 'rgba(13,110,253,0.7)', borderWidth: 0 }] },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) {
+          var r = sociRegione[ctx.dataIndex];
+          return r.soci.toLocaleString('it-IT') + ' soci — ' + r.n_sezioni + ' sezioni';
+        }}}},
+      scales: { x: { beginAtZero: true } }
+    }
+  });
+});
+
+// ── Top 10 soci ───────────────────────────────────────────────────────────────
+lazyInit('tab-top10soci', function() {
+  var MAX = 28992, tbody = document.getElementById('tbody-top10-soci');
+  top10Soci.forEach(function(r, i) {
+    var pct = Math.round(r.cai_soci_ultimo_anno / MAX * 100);
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr><td>' + (i+1) + '</td>' +
+      '<td><a href="/sezione/' + r.codice_cai + '">' + r.cai_denominazione + '</a></td>' +
+      '<td>' + r.cai_soci_ultimo_anno.toLocaleString('it-IT') + '</td>' +
+      '<td><div class="progress" style="height:8px"><div class="progress-bar" style="width:' + pct + '%"></div></div></td></tr>'
+    );
+  });
+});
+
+// ── Copertura ETS ─────────────────────────────────────────────────────────────
+lazyInit('tab-copertura', function() {
   var tot = copertura.totale || 226;
   var items = [
-    { label: 'Agganciati a sezione CAI',    n: copertura.agganciati },
-    { label: 'Con bilanci analizzati',       n: copertura.con_bilanci },
-    { label: 'Con allegati scaricati',       n: copertura.con_allegati },
-    { label: 'Con coordinate geografiche',   n: copertura.con_coordinate }
+    { label: 'Agganciati a sezione CAI',   n: copertura.agganciati },
+    { label: 'Con bilanci analizzati',      n: copertura.con_bilanci },
+    { label: 'Con allegati scaricati',      n: copertura.con_allegati },
+    { label: 'Con coordinate geografiche',  n: copertura.con_coordinate }
   ];
   var html = '';
   items.forEach(function(item) {
@@ -173,289 +272,95 @@ var qualitaDati = {{ qualita_dati | tojson }};
       '<div class="col-4 small">' + item.label + '</div>' +
       '<div class="col-6"><div class="progress" style="height:16px">' +
       '<div class="progress-bar ' + cls + '" style="width:' + pct + '%"></div></div></div>' +
-      '<div class="col-2 small text-end">' + item.n + '/' + tot + ' (' + pct + '%)</div>' +
-      '</div>';
+      '<div class="col-2 small text-end">' + item.n + '/' + tot + ' (' + pct + '%)</div></div>';
   });
   document.getElementById('copertura-rows').innerHTML = html;
-})();
-</script>
+});
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Proventi ETS 2024 per regione</div>
-  <div class="card-body">
-    <canvas id="chart-proventi-regione"></canvas>
-    <p class="text-muted small mt-2 mb-0">Dati parziali — solo enti con bilancio 2024 analizzato</p>
-  </div>
-</div>
-<script>
-(function() {
+// ── Proventi 2024 per regione ─────────────────────────────────────────────────
+lazyInit('tab-proventi', function() {
   if (!proventi2024Regione.length) return;
   var labels = proventi2024Regione.map(function(r) { return r.sede_regione; });
-  var data = proventi2024Regione.map(function(r) { return r.totale_proventi; });
+  var data   = proventi2024Regione.map(function(r) { return r.totale_proventi; });
   new Chart(document.getElementById('chart-proventi-regione'), {
     type: 'bar',
-    data: {
-      labels: labels,
-      datasets: [{
-        data: data,
-        backgroundColor: 'rgba(25,135,84,0.7)',
-        borderWidth: 0
-      }]
-    },
+    data: { labels: labels, datasets: [{ data: data, backgroundColor: 'rgba(25,135,84,0.7)', borderWidth: 0 }] },
     options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              var v = ctx.parsed.y;
-              return '€ ' + v.toLocaleString('it-IT', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(v) {
-              return '€ ' + (v/1000000).toFixed(1) + 'M';
-            }
-          }
-        }
-      }
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) {
+          return '€ ' + ctx.parsed.y.toLocaleString('it-IT', {minimumFractionDigits:0,maximumFractionDigits:0});
+        }}}},
+      scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '€ ' + (v/1000000).toFixed(1) + 'M'; }}}}
     }
   });
-})();
-</script>
+});
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Evoluzione proventi nel tempo</div>
-  <div class="card-body">
-    <div class="mb-3">
-      <select id="sel-ente" class="form-select form-select-sm w-auto"></select>
-    </div>
-    <canvas id="chart-proventi-tempo"></canvas>
-  </div>
-</div>
-<script>
-(function() {
+// ── Evoluzione proventi ───────────────────────────────────────────────────────
+lazyInit('tab-evoluzione', function() {
   if (!bilanciEnte.length) return;
   var sel = document.getElementById('sel-ente');
   bilanciEnte.forEach(function(e, i) {
-    var opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = e.denominazione;
-    sel.appendChild(opt);
+    var opt = document.createElement('option'); opt.value = i; opt.textContent = e.denominazione; sel.appendChild(opt);
   });
   var chart = new Chart(document.getElementById('chart-proventi-tempo'), {
     type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        data: [],
-        borderColor: 'rgba(13,110,253,1)',
-        backgroundColor: 'rgba(13,110,253,0.1)',
-        fill: true,
-        tension: 0.3
-      }]
-    },
+    data: { labels: [], datasets: [{ data: [], borderColor:'rgba(13,110,253,1)', backgroundColor:'rgba(13,110,253,0.1)', fill:true, tension:0.3 }] },
     options: {
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              var v = ctx.parsed.y;
-              return '€ ' + v.toLocaleString('it-IT', {minimumFractionDigits: 0, maximumFractionDigits: 0});
-            }
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(v) {
-              return '€ ' + (v/1000).toFixed(0) + 'k';
-            }
-          }
-        }
-      }
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: function(ctx) {
+          return '€ ' + ctx.parsed.y.toLocaleString('it-IT', {minimumFractionDigits:0,maximumFractionDigits:0});
+        }}}},
+      scales: { y: { beginAtZero: true, ticks: { callback: function(v) { return '€ ' + (v/1000).toFixed(0) + 'k'; }}}}
     }
   });
   function updateChart(idx) {
-    var ente = bilanciEnte[idx];
-    chart.data.labels = ente.punti.map(function(p) { return p.anno; });
-    chart.data.datasets[0].data = ente.punti.map(function(p) { return p.totale_proventi; });
+    var e = bilanciEnte[idx];
+    chart.data.labels = e.punti.map(function(p) { return p.anno; });
+    chart.data.datasets[0].data = e.punti.map(function(p) { return p.totale_proventi; });
     chart.update();
   }
   sel.addEventListener('change', function() { updateChart(parseInt(this.value)); });
   updateChart(0);
-})();
-</script>
+});
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Distribuzione allegati per tipo</div>
-  <div class="card-body">
-    <canvas id="chart-allegati-tipo"></canvas>
-  </div>
-</div>
-<script>
-(function() {
-  if (!allegatiPerTipo.length) return;
-  var COLORS = [
-    '#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997'
-  ];
-  var labels = allegatiPerTipo.map(function(r) { return r.tipo + ' (' + r.n + ')'; });
-  var data = allegatiPerTipo.map(function(r) { return r.n; });
+// ── Allegati per tipo ─────────────────────────────────────────────────────────
+lazyInit('tab-allegati', function() {
+  var COLORS = ['#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997'];
   new Chart(document.getElementById('chart-allegati-tipo'), {
     type: 'doughnut',
     data: {
-      labels: labels,
-      datasets: [{
-        data: data,
-        backgroundColor: COLORS.slice(0, data.length)
-      }]
+      labels: allegatiPerTipo.map(function(r) { return r.tipo + ' (' + r.n + ')'; }),
+      datasets: [{ data: allegatiPerTipo.map(function(r) { return r.n; }), backgroundColor: COLORS }]
     },
-    options: {
-      plugins: {
-        legend: { position: 'right' }
-      }
-    }
+    options: { plugins: { legend: { position: 'right' }}}
   });
-})();
-</script>
+});
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Sezioni con più sottosezioni</div>
-  <div class="card-body p-0">
-    <table class="table table-sm mb-0">
-      <thead><tr><th>#</th><th>Denominazione</th><th>Sottosezioni</th><th style="min-width:120px">Barra</th></tr></thead>
-      <tbody id="tbody-top10-sottosezioni"></tbody>
-    </table>
-  </div>
-</div>
-<script>
-(function() {
-  var MAX_SS = 30;
-  var tbody = document.getElementById('tbody-top10-sottosezioni');
+// ── Top 10 sottosezioni ───────────────────────────────────────────────────────
+lazyInit('tab-sottosezioni', function() {
+  var MAX = 30, tbody = document.getElementById('tbody-top10-sottosezioni');
   top10Sottosezioni.forEach(function(r, i) {
-    var pct = Math.round(r.n / MAX_SS * 100);
+    var pct = Math.round(r.n / MAX * 100);
     tbody.insertAdjacentHTML('beforeend',
-      '<tr>' +
-      '<td>' + (i+1) + '</td>' +
+      '<tr><td>' + (i+1) + '</td>' +
       '<td><a href="/sezione/' + r.codice_cai + '?tab=sottosezioni">' + r.cai_denominazione + '</a></td>' +
       '<td>' + r.n + '</td>' +
-      '<td><div class="progress" style="height:8px"><div class="progress-bar" style="width:' + pct + '%"></div></div></td>' +
-      '</tr>'
+      '<td><div class="progress" style="height:8px"><div class="progress-bar bg-info" style="width:' + pct + '%"></div></div></td></tr>'
     );
   });
-})();
-</script>
+});
 
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Qualità dati</div>
-  <div class="card-body p-0">
-    <table class="table table-sm mb-0">
-      <thead><tr><th>Problema</th><th>N. elementi</th><th>Azione</th></tr></thead>
-      <tbody id="tbody-qualita"></tbody>
-    </table>
-  </div>
-</div>
-<script>
-(function() {
+// ── Qualità dati ──────────────────────────────────────────────────────────────
+lazyInit('tab-qualita', function() {
   var tbody = document.getElementById('tbody-qualita');
   qualitaDati.forEach(function(r) {
-    var badgeCls = r.n > 0 ? 'bg-warning text-dark' : 'bg-success';
+    var cls = r.n > 0 ? 'bg-warning text-dark' : 'bg-success';
     tbody.insertAdjacentHTML('beforeend',
-      '<tr>' +
-      '<td>' + r.label + '</td>' +
-      '<td><span class="badge ' + badgeCls + '">' + r.n + '</span></td>' +
-      '<td><a href="' + r.url + '">Vedi →</a></td>' +
-      '</tr>'
+      '<tr><td>' + r.label + '</td>' +
+      '<td><span class="badge ' + cls + '">' + r.n + '</span></td>' +
+      '<td><a href="' + r.url + '">Vedi →</a></td></tr>'
     );
   });
-})();
-</script>
-
-<div class="card mb-4">
-  <div class="card-header fw-semibold">Sezioni CAI per regione</div>
-  <div class="card-body">
-    <div id="map-regioni" style="height:420px"></div>
-  </div>
-</div>
-<script>
-(function() {
-  // Map GeoJSON region names -> DB uppercase names
-  var NORM = {
-    "Valle d'Aosta": "VALLE D'AOSTA",
-    "Trentino-Alto Adige": "TRENTINO-ALTO ADIGE",
-    "Friuli Venezia Giulia": "FRIULI-VENEZIA GIULIA",
-    "Emilia-Romagna": "EMILIA-ROMAGNA"
-  };
-  function normName(n) {
-    return NORM[n] || n.toUpperCase();
-  }
-  // Build lookup: db_region_name -> {n_sezioni, soci}
-  var lookup = {};
-  sociRegione.forEach(function(r) { lookup[r.cai_regione] = r; });
-
-  var container = document.getElementById('map-regioni');
-  var W = container.clientWidth || 600;
-  var H = 420;
-  var svg = d3.select('#map-regioni').append('svg')
-    .attr('width', W).attr('height', H);
-
-  var maxSezioni = d3.max(sociRegione, function(r) { return r.n_sezioni; }) || 1;
-  var color = d3.scaleSequential(d3.interpolateBlues).domain([0, maxSezioni]);
-
-  var projection = d3.geoMercator()
-    .center([12.5, 42])
-    .scale(W * 3.5)
-    .translate([W / 2, H / 2]);
-  var path = d3.geoPath().projection(projection);
-
-  // Tooltip
-  var tip = d3.select('body').append('div')
-    .style('position','absolute')
-    .style('background','rgba(0,0,0,0.75)')
-    .style('color','#fff')
-    .style('padding','6px 10px')
-    .style('border-radius','4px')
-    .style('font-size','13px')
-    .style('pointer-events','none')
-    .style('display','none');
-
-  d3.json('/static/it-regions.geojson').then(function(geo) {
-    svg.selectAll('path')
-      .data(geo.features)
-      .enter().append('path')
-        .attr('d', path)
-        .attr('stroke', '#fff')
-        .attr('stroke-width', 0.5)
-        .attr('fill', function(d) {
-          var dbName = normName(d.properties.name);
-          var row = lookup[dbName];
-          return row ? color(row.n_sezioni) : '#eee';
-        })
-        .on('mouseover', function(event, d) {
-          var dbName = normName(d.properties.name);
-          var row = lookup[dbName];
-          var html = '<strong>' + d.properties.name + '</strong>';
-          if (row) {
-            html += '<br>' + row.n_sezioni + ' sezioni';
-            html += '<br>' + row.soci.toLocaleString('it-IT') + ' soci';
-          } else {
-            html += '<br>Nessun dato';
-          }
-          tip.style('display','block').html(html);
-        })
-        .on('mousemove', function(event) {
-          tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY - 28) + 'px');
-        })
-        .on('mouseout', function() { tip.style('display','none'); });
-  });
-})();
+});
 </script>
 {% endblock %}
