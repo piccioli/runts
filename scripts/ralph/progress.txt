@@ -44,3 +44,13 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - Used `<h6 class="text-muted fw-semibold small text-uppercase">` for section headings inside a pane
   - Manual browser verification needed (no browser tools)
 ---
+
+## 2026-06-01 - US-004
+- Moved bilanci table from standalone card outside tabs INTO the `tab-pane#bilanci`
+- Added empty-state message `<p class="text-muted">Nessun dato di bilancio disponibile.</p>` when no data
+- Removed standalone bilanci card from outside the main card
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Empty-state messages must be inside the pane (not conditional on data) so the tab always shows something
+  - Manual browser verification needed
+---

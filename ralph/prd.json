@@ -63,7 +63,7 @@
         "Verify in browser: /ente/83894?tab=bilanci mostra i 4 anni di bilancio di CAI Pisa; aprire la scheda di un ente senza bilanci e verificare il messaggio vuoto"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {

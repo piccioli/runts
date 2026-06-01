@@ -154,6 +154,48 @@
 
     <div class="tab-pane {% if active_tab == 'allegati' %}show active{% endif %}"
          id="allegati">
+      {% if allegati %}
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Tipo</th>
+              <th>Codice pratica</th>
+              <th>Anno</th>
+              <th>Dimensione</th>
+              <th>Download</th>
+              <th>RUNTS</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for att in allegati %}
+            <tr>
+              <td class="small">{{ att.tipo or "—" }}</td>
+              <td class="small text-muted">{{ att.codice_pratica or "—" }}</td>
+              <td>{{ att.anno or "—" }}</td>
+              <td class="small text-muted">{{ att.size | human_size }}</td>
+              <td>
+                {% if att.path %}
+                <a href="/attachments/{{ ente.id_runts }}/{{ att.filename }}" class="btn btn-sm btn-outline-primary py-0">
+                  Scarica
+                </a>
+                {% else %}
+                <span class="text-muted small">{{ att.skip_reason or "—" }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if att.url_originale %}
+                <a href="{{ att.url_originale }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0">↗</a>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted p-3 mb-0">Nessun documento disponibile.</p>
+      {% endif %}
     </div>
 
     <div class="tab-pane {% if active_tab == 'mappa' %}show active{% endif %}"
@@ -178,50 +220,6 @@
     .bindPopup({{ ente.denominazione | tojson }})
     .openPopup();
 </script>
-{% endif %}
-
-{% if allegati %}
-<div class="card shadow-sm mt-4">
-  <div class="card-header bg-secondary text-white small fw-semibold">Atti e documenti</div>
-  <div class="table-responsive">
-    <table class="table table-sm table-hover mb-0">
-      <thead class="table-light">
-        <tr>
-          <th>Tipo</th>
-          <th>Codice pratica</th>
-          <th>Anno</th>
-          <th>Dimensione</th>
-          <th>Download</th>
-          <th>RUNTS</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for att in allegati %}
-        <tr>
-          <td class="small">{{ att.tipo or "—" }}</td>
-          <td class="small text-muted">{{ att.codice_pratica or "—" }}</td>
-          <td>{{ att.anno or "—" }}</td>
-          <td class="small text-muted">{{ att.size | human_size }}</td>
-          <td>
-            {% if att.path %}
-            <a href="/attachments/{{ ente.id_runts }}/{{ att.filename }}" class="btn btn-sm btn-outline-primary py-0">
-              Scarica
-            </a>
-            {% else %}
-            <span class="text-muted small">{{ att.skip_reason or "—" }}</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if att.url_originale %}
-            <a href="{{ att.url_originale }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0">↗</a>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
 {% endif %}
 
 
