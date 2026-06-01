@@ -227,4 +227,70 @@ var qualitaDati = {{ qualita_dati | tojson }};
   });
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Evoluzione proventi nel tempo</div>
+  <div class="card-body">
+    <div class="mb-3">
+      <select id="sel-ente" class="form-select form-select-sm w-auto"></select>
+    </div>
+    <canvas id="chart-proventi-tempo"></canvas>
+  </div>
+</div>
+<script>
+(function() {
+  if (!bilanciEnte.length) return;
+  var sel = document.getElementById('sel-ente');
+  bilanciEnte.forEach(function(e, i) {
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = e.denominazione;
+    sel.appendChild(opt);
+  });
+  var chart = new Chart(document.getElementById('chart-proventi-tempo'), {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        data: [],
+        borderColor: 'rgba(13,110,253,1)',
+        backgroundColor: 'rgba(13,110,253,0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var v = ctx.parsed.y;
+              return '€ ' + v.toLocaleString('it-IT', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(v) {
+              return '€ ' + (v/1000).toFixed(0) + 'k';
+            }
+          }
+        }
+      }
+    }
+  });
+  function updateChart(idx) {
+    var ente = bilanciEnte[idx];
+    chart.data.labels = ente.punti.map(function(p) { return p.anno; });
+    chart.data.datasets[0].data = ente.punti.map(function(p) { return p.totale_proventi; });
+    chart.update();
+  }
+  sel.addEventListener('change', function() { updateChart(parseInt(this.value)); });
+  updateChart(0);
+})();
+</script>
 {% endblock %}
