@@ -131,3 +131,17 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
   - Wrapping the `httpx.Client` context manager inside the retry-called lambda works cleanly — client is created per `fetch_subsections()` call
   - Same `_with_retry` helper reused; all exceptions (including httpx errors after max retries) are caught at the outer level and return `[]`
 ---
+
+## 2026-06-01 - US-004 (sezioni-cai PRD)
+- Created `scraper/cai_main.py` with argparse: `--db PATH` (default: runts.db), `--verbose`, `--no-subsections`
+- Calls `fetch_all_sections()` then `upsert_sezione_cai()` for every section, tracking inserted/updated/failed counts
+- Without `--no-subsections`, iterates all sections and calls `fetch_subsections(codice)` + `upsert_sottosezione_cai()` for each result
+- Prints a formatted report with section and sub-section counts at the end
+- Executable as `python3 -m scraper.cai_main` (standard `if __name__ == "__main__": main()` pattern)
+- Files changed: `scraper/cai_main.py` (new)
+- **Learnings for future iterations:**
+  - Followed the same sync pattern as `scraper/main.py` — no async needed since `cai_scraper.py` uses httpx synchronously
+  - `init_db()` is called at startup to ensure tables exist before any upsert
+  - Wrapped each upsert in try/except so a single failing record doesn't abort the whole run
+  - `--no-subsections` flag uses `dest="no_subsections"` so it maps to a clean attribute name
+---
