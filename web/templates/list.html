@@ -55,6 +55,7 @@
       <table class="table table-hover table-sm align-middle bg-white rounded shadow-sm">
         <thead class="table-light">
           <tr>
+            <th>Codice CAI</th>
             <th>Denominazione</th>
             <th>Comune</th>
             <th>Regione</th>
@@ -64,11 +65,13 @@
           {% for e in enti %}
           {% set back_url = "/?q=" ~ q ~ "&regione=" ~ regione ~ "&page=" ~ page %}
           <tr>
+            <td class="text-muted small">{{ e.codice_cai or "—" }}</td>
             <td>
               {% if e.id_runts %}
               <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
                 {{ e.cai_denominazione }}
               </a>
+              <span class="badge bg-success ms-1">ETS</span>
               {% else %}
               {{ e.cai_denominazione }}
               {% endif %}
