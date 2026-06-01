@@ -352,4 +352,29 @@ var qualitaDati = {{ qualita_dati | tojson }};
   });
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Qualità dati</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>Problema</th><th>N. elementi</th><th>Azione</th></tr></thead>
+      <tbody id="tbody-qualita"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  var tbody = document.getElementById('tbody-qualita');
+  qualitaDati.forEach(function(r) {
+    var badgeCls = r.n > 0 ? 'bg-warning text-dark' : 'bg-success';
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr>' +
+      '<td>' + r.label + '</td>' +
+      '<td><span class="badge ' + badgeCls + '">' + r.n + '</span></td>' +
+      '<td><a href="' + r.url + '">Vedi →</a></td>' +
+      '</tr>'
+    );
+  });
+})();
+</script>
 {% endblock %}
