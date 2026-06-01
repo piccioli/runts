@@ -1,0 +1,84 @@
+import json
+import logging
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+import httpx
+
+logger = logging.getLogger(__name__)
+
+_REGIONS = [
+    "abruzzo", "basilicata", "calabria", "campania", "emilia-romagna",
+    "friuli-venezia-giulia", "lazio", "liguria", "lombardia", "marche",
+    "molise", "piemonte", "puglia", "sardegna", "sicilia", "toscana",
+    "trentino-alto-adige", "umbria", "valle-d-aosta", "veneto",
+]
+
+_SECTIONS_URL = "https://www.cai.it/wp-json/cai-section/v2/sections-list-simple"
+_MAX_RETRIES = 3
+
+
+def _with_retry(fn: Any, max_retries: int = _MAX_RETRIES) -> Any:
+    """Call fn() with exponential backoff on httpx failures."""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except (httpx.HTTPError, httpx.TimeoutException) as exc:
+            if attempt == max_retries - 1:
+                raise
+            wait = 2 ** attempt
+            logger.warning("Attempt %d/%d failed, retrying in %ds: %s", attempt + 1, max_retries, wait, exc)
+            time.sleep(wait)
+
+
+def _normalize_section(raw: dict, regione: str) -> dict:
+    """Map API response fields to sezioni_cai column names."""
+    office_addr = raw.get("officeAddress") or raw.get("office_address")
+    postal_addr = raw.get("postalAddress") or raw.get("postal_address")
+    return {
+        "codice_cai": raw.get("code") or raw.get("id"),
+        "cai_denominazione": raw.get("name") or raw.get("denominazione") or "",
+        "cai_codice_fiscale": raw.get("fiscalCode") or raw.get("fiscal_code"),
+        "cai_partita_iva": raw.get("vatNumber") or raw.get("vat_number"),
+        "cai_email": raw.get("email"),
+        "cai_pec": raw.get("pec"),
+        "cai_telefono_sede": raw.get("officePhone") or raw.get("office_phone"),
+        "cai_telefono": raw.get("phone"),
+        "cai_fax": raw.get("fax"),
+        "cai_indirizzo_sede": json.dumps(office_addr, ensure_ascii=False) if office_addr is not None else None,
+        "cai_indirizzo_postale": json.dumps(postal_addr, ensure_ascii=False) if postal_addr is not None else None,
+        "cai_sito_web": raw.get("website") or raw.get("sito_web"),
+        "cai_orari": raw.get("hours") or raw.get("orari"),
+        "cai_avvisi": raw.get("notices") or raw.get("avvisi"),
+        "cai_anno_fondazione": raw.get("foundingYear") or raw.get("founding_year"),
+        "cai_soci_ultimo_anno": raw.get("lastYearMembers") or raw.get("last_year_members"),
+        "cai_lat": raw.get("lat"),
+        "cai_lon": raw.get("lon"),
+        "cai_regione": regione,
+        "cai_scraped_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def fetch_all_sections() -> list[dict]:
+    """Fetch all CAI sections from the REST API for all 20 Italian regions."""
+    results: list[dict] = []
+    with httpx.Client(timeout=30.0) as client:
+        for regione in _REGIONS:
+            logger.info("Fetching CAI sections for region: %s", regione)
+            try:
+                def _fetch(r: str = regione, c: httpx.Client = client) -> Any:
+                    resp = c.get(_SECTIONS_URL, params={"region": r})
+                    resp.raise_for_status()
+                    return resp.json()
+
+                data = _with_retry(_fetch)
+                if isinstance(data, list):
+                    for raw in data:
+                        results.append(_normalize_section(raw, regione))
+                else:
+                    logger.warning("Unexpected response type for region %s: %s", regione, type(data).__name__)
+            except Exception as exc:
+                logger.error("Failed to fetch region %s after %d retries: %s", regione, _MAX_RETRIES, exc)
+
+    return results
