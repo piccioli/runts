@@ -121,4 +121,31 @@ var qualitaDati = {{ qualita_dati | tojson }};
   });
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Top 10 sezioni per numero soci</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>#</th><th>Denominazione</th><th>Soci</th><th style="min-width:120px">Barra</th></tr></thead>
+      <tbody id="tbody-top10-soci"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  var MAX_SOCI = 28992;
+  var tbody = document.getElementById('tbody-top10-soci');
+  top10Soci.forEach(function(r, i) {
+    var pct = Math.round(r.cai_soci_ultimo_anno / MAX_SOCI * 100);
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td><a href="/sezione/' + r.codice_cai + '">' + r.cai_denominazione + '</a></td>' +
+      '<td>' + r.cai_soci_ultimo_anno.toLocaleString('it-IT') + '</td>' +
+      '<td><div class="progress" style="height:8px"><div class="progress-bar" style="width:' + pct + '%"></div></div></td>' +
+      '</tr>'
+    );
+  });
+})();
+</script>
 {% endblock %}
