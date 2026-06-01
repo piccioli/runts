@@ -293,4 +293,36 @@ var qualitaDati = {{ qualita_dati | tojson }};
   updateChart(0);
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Distribuzione allegati per tipo</div>
+  <div class="card-body">
+    <canvas id="chart-allegati-tipo"></canvas>
+  </div>
+</div>
+<script>
+(function() {
+  if (!allegatiPerTipo.length) return;
+  var COLORS = [
+    '#0d6efd','#198754','#ffc107','#dc3545','#0dcaf0','#6f42c1','#fd7e14','#20c997'
+  ];
+  var labels = allegatiPerTipo.map(function(r) { return r.tipo + ' (' + r.n + ')'; });
+  var data = allegatiPerTipo.map(function(r) { return r.n; });
+  new Chart(document.getElementById('chart-allegati-tipo'), {
+    type: 'doughnut',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: COLORS.slice(0, data.length)
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { position: 'right' }
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}
