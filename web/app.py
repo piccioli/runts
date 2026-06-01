@@ -361,16 +361,173 @@ async def gr_detail(request: Request, gr_codice: str, back: Optional[str] = None
 
 @app.get("/stats", response_class=HTMLResponse)
 async def stats(request: Request):
-    counts = {"sezioni_cai": 0, "enti": 0, "allegati": 0, "bilanci": 0}
+    kpi: dict = {
+        "sezioni_totali": 0,
+        "soci_totali": 0,
+        "enti_ets": 0,
+        "ets_agganciati": 0,
+        "gr_totali": 21,
+        "gr_agganciati": 0,
+        "bilanci_analizzati": 0,
+        "copertura_bilanci_pct": 0.0,
+    }
+    soci_per_regione: list = []
+    proventi_2024_per_regione: list = []
+    top10_soci: list = []
+    top10_sottosezioni: list = []
+    allegati_per_tipo: list = []
+    bilanci_per_ente: list = []
+    copertura_ets: dict = {
+        "totale": 226, "agganciati": 0, "con_bilanci": 0,
+        "con_allegati": 0, "con_coordinate": 0,
+    }
+    qualita_dati: list = []
+
     if _db_exists():
         conn = get_db()
         try:
-            for table in counts:
-                if _table_exists(conn, table):
-                    counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            has_sezioni = _table_exists(conn, "sezioni_cai")
+            has_enti = _table_exists(conn, "enti")
+            has_bilanci = _table_exists(conn, "bilanci")
+            has_allegati = _table_exists(conn, "allegati")
+            has_gr = _table_exists(conn, "gruppi_regionali_cai")
+            has_sottosezioni = _table_exists(conn, "sottosezioni_cai")
+
+            if has_sezioni:
+                kpi["sezioni_totali"] = conn.execute("SELECT COUNT(*) FROM sezioni_cai").fetchone()[0]
+                kpi["soci_totali"] = conn.execute(
+                    "SELECT COALESCE(SUM(cai_soci_ultimo_anno), 0) FROM sezioni_cai"
+                ).fetchone()[0]
+                rows = conn.execute(
+                    "SELECT cai_regione, COUNT(*) n_sezioni, SUM(cai_soci_ultimo_anno) soci "
+                    "FROM sezioni_cai WHERE cai_regione != '' "
+                    "GROUP BY cai_regione ORDER BY soci DESC"
+                ).fetchall()
+                soci_per_regione = [
+                    {"cai_regione": r[0], "n_sezioni": r[1], "soci": r[2] or 0} for r in rows
+                ]
+                rows = conn.execute(
+                    "SELECT codice_cai, cai_denominazione, cai_soci_ultimo_anno "
+                    "FROM sezioni_cai WHERE cai_soci_ultimo_anno IS NOT NULL "
+                    "ORDER BY cai_soci_ultimo_anno DESC LIMIT 10"
+                ).fetchall()
+                top10_soci = [
+                    {"codice_cai": r[0], "cai_denominazione": r[1], "cai_soci_ultimo_anno": r[2]}
+                    for r in rows
+                ]
+
+            if has_enti:
+                kpi["enti_ets"] = conn.execute("SELECT COUNT(*) FROM enti").fetchone()[0]
+                copertura_ets["totale"] = kpi["enti_ets"] or 226
+                copertura_ets["con_coordinate"] = conn.execute(
+                    "SELECT COUNT(*) FROM enti WHERE lat IS NOT NULL"
+                ).fetchone()[0]
+
+            if has_enti and has_sezioni:
+                kpi["ets_agganciati"] = conn.execute(
+                    "SELECT COUNT(*) FROM enti e "
+                    "JOIN sezioni_cai s ON e.codice_fiscale = s.cai_codice_fiscale"
+                ).fetchone()[0]
+                copertura_ets["agganciati"] = kpi["ets_agganciati"]
+
+            if has_gr:
+                kpi["gr_totali"] = conn.execute(
+                    "SELECT COUNT(*) FROM gruppi_regionali_cai"
+                ).fetchone()[0]
+                kpi["gr_agganciati"] = conn.execute(
+                    "SELECT COUNT(*) FROM gruppi_regionali_cai WHERE gr_id_runts IS NOT NULL"
+                ).fetchone()[0]
+
+            if has_bilanci:
+                kpi["bilanci_analizzati"] = conn.execute(
+                    "SELECT COUNT(*) FROM bilanci"
+                ).fetchone()[0]
+                enti_con_bilanci_cnt = conn.execute(
+                    "SELECT COUNT(DISTINCT id_runts) FROM bilanci"
+                ).fetchone()[0]
+                if kpi["enti_ets"] > 0:
+                    kpi["copertura_bilanci_pct"] = round(enti_con_bilanci_cnt / kpi["enti_ets"] * 100, 1)
+                copertura_ets["con_bilanci"] = enti_con_bilanci_cnt
+
+            if has_allegati:
+                copertura_ets["con_allegati"] = conn.execute(
+                    "SELECT COUNT(DISTINCT id_runts) FROM allegati"
+                ).fetchone()[0]
+                rows = conn.execute(
+                    "SELECT tipo, COUNT(*) n FROM allegati GROUP BY tipo ORDER BY n DESC"
+                ).fetchall()
+                allegati_per_tipo = [{"tipo": r[0], "n": r[1]} for r in rows]
+
+            if has_bilanci and has_enti:
+                rows = conn.execute(
+                    "SELECT e.sede_regione, SUM(b.totale_proventi) totale "
+                    "FROM bilanci b JOIN enti e ON b.id_runts = e.id_runts "
+                    "WHERE b.anno = 2024 AND b.totale_proventi IS NOT NULL "
+                    "GROUP BY e.sede_regione ORDER BY totale DESC"
+                ).fetchall()
+                proventi_2024_per_regione = [
+                    {"sede_regione": r[0], "totale_proventi": r[1]} for r in rows
+                ]
+                rows = conn.execute(
+                    "SELECT b.id_runts, e.denominazione, b.anno, b.totale_proventi "
+                    "FROM bilanci b JOIN enti e ON b.id_runts = e.id_runts "
+                    "WHERE b.totale_proventi IS NOT NULL ORDER BY b.id_runts, b.anno"
+                ).fetchall()
+                _ente_map: dict = {}
+                for r in rows:
+                    if r[0] not in _ente_map:
+                        _ente_map[r[0]] = {"id_runts": r[0], "denominazione": r[1], "punti": []}
+                    _ente_map[r[0]]["punti"].append({"anno": r[2], "totale_proventi": r[3]})
+                bilanci_per_ente = [v for v in _ente_map.values() if len(v["punti"]) >= 2]
+
+            if has_sottosezioni and has_sezioni:
+                rows = conn.execute(
+                    "SELECT sc.codice_cai, sc.cai_denominazione, COUNT(*) n "
+                    "FROM sottosezioni_cai ss "
+                    "JOIN sezioni_cai sc ON ss.cai_sezione_codice = sc.codice_cai "
+                    "GROUP BY ss.cai_sezione_codice ORDER BY n DESC LIMIT 10"
+                ).fetchall()
+                top10_sottosezioni = [
+                    {"codice_cai": r[0], "cai_denominazione": r[1], "n": r[2]} for r in rows
+                ]
+
+            # qualita_dati: fixed order of 4 items
+            n_no_cf = conn.execute(
+                "SELECT COUNT(*) FROM sezioni_cai WHERE cai_codice_fiscale IS NULL"
+            ).fetchone()[0] if has_sezioni else 0
+            n_ets_non_agg = conn.execute(
+                "SELECT COUNT(*) FROM enti e "
+                "LEFT JOIN sezioni_cai s ON e.codice_fiscale = s.cai_codice_fiscale "
+                "WHERE s.codice_cai IS NULL"
+            ).fetchone()[0] if (has_enti and has_sezioni) else 0
+            n_no_soci = conn.execute(
+                "SELECT COUNT(*) FROM sezioni_cai "
+                "WHERE cai_soci_ultimo_anno IS NULL OR cai_soci_ultimo_anno = 0"
+            ).fetchone()[0] if has_sezioni else 0
+            n_gr_non_agg = conn.execute(
+                "SELECT COUNT(*) FROM gruppi_regionali_cai WHERE gr_id_runts IS NULL"
+            ).fetchone()[0] if has_gr else kpi["gr_totali"]
+            qualita_dati = [
+                {"label": "Sezioni senza CF nel registro CAI", "n": n_no_cf, "url": "/?issues=1"},
+                {"label": "Enti ETS non agganciati a sezione CAI", "n": n_ets_non_agg, "url": "/ets"},
+                {"label": "Sezioni CAI senza dati soci", "n": n_no_soci, "url": "/?issues=1"},
+                {"label": "Gruppi Regionali non agganciati RUNTS", "n": n_gr_non_agg, "url": "/gruppi-regionali"},
+            ]
         finally:
             conn.close()
-    return _tr(request, "stats.html", {"counts": counts, "active_page": "stats"})
+
+    return _tr(request, "stats.html", {
+        "kpi": kpi,
+        "soci_per_regione": soci_per_regione,
+        "proventi_2024_per_regione": proventi_2024_per_regione,
+        "top10_soci": top10_soci,
+        "top10_sottosezioni": top10_sottosezioni,
+        "allegati_per_tipo": allegati_per_tipo,
+        "bilanci_per_ente": bilanci_per_ente,
+        "copertura_ets": copertura_ets,
+        "qualita_dati": qualita_dati,
+        "active_page": "stats",
+    })
 
 
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
