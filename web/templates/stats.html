@@ -2,6 +2,7 @@
 {% block title %}Statistiche — RUNTS · Sezioni CAI{% endblock %}
 {% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
 <script>
 var sociRegione = {{ soci_per_regione | tojson }};
 var proventi2024Regione = {{ proventi_2024_per_regione | tojson }};
@@ -374,6 +375,86 @@ var qualitaDati = {{ qualita_dati | tojson }};
       '<td><a href="' + r.url + '">Vedi →</a></td>' +
       '</tr>'
     );
+  });
+})();
+</script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Sezioni CAI per regione</div>
+  <div class="card-body">
+    <div id="map-regioni" style="height:420px"></div>
+  </div>
+</div>
+<script>
+(function() {
+  // Map GeoJSON region names -> DB uppercase names
+  var NORM = {
+    "Valle d'Aosta": "VALLE D'AOSTA",
+    "Trentino-Alto Adige": "TRENTINO-ALTO ADIGE",
+    "Friuli Venezia Giulia": "FRIULI-VENEZIA GIULIA",
+    "Emilia-Romagna": "EMILIA-ROMAGNA"
+  };
+  function normName(n) {
+    return NORM[n] || n.toUpperCase();
+  }
+  // Build lookup: db_region_name -> {n_sezioni, soci}
+  var lookup = {};
+  sociRegione.forEach(function(r) { lookup[r.cai_regione] = r; });
+
+  var container = document.getElementById('map-regioni');
+  var W = container.clientWidth || 600;
+  var H = 420;
+  var svg = d3.select('#map-regioni').append('svg')
+    .attr('width', W).attr('height', H);
+
+  var maxSezioni = d3.max(sociRegione, function(r) { return r.n_sezioni; }) || 1;
+  var color = d3.scaleSequential(d3.interpolateBlues).domain([0, maxSezioni]);
+
+  var projection = d3.geoMercator()
+    .center([12.5, 42])
+    .scale(W * 3.5)
+    .translate([W / 2, H / 2]);
+  var path = d3.geoPath().projection(projection);
+
+  // Tooltip
+  var tip = d3.select('body').append('div')
+    .style('position','absolute')
+    .style('background','rgba(0,0,0,0.75)')
+    .style('color','#fff')
+    .style('padding','6px 10px')
+    .style('border-radius','4px')
+    .style('font-size','13px')
+    .style('pointer-events','none')
+    .style('display','none');
+
+  d3.json('/static/it-regions.geojson').then(function(geo) {
+    svg.selectAll('path')
+      .data(geo.features)
+      .enter().append('path')
+        .attr('d', path)
+        .attr('stroke', '#fff')
+        .attr('stroke-width', 0.5)
+        .attr('fill', function(d) {
+          var dbName = normName(d.properties.name);
+          var row = lookup[dbName];
+          return row ? color(row.n_sezioni) : '#eee';
+        })
+        .on('mouseover', function(event, d) {
+          var dbName = normName(d.properties.name);
+          var row = lookup[dbName];
+          var html = '<strong>' + d.properties.name + '</strong>';
+          if (row) {
+            html += '<br>' + row.n_sezioni + ' sezioni';
+            html += '<br>' + row.soci.toLocaleString('it-IT') + ' soci';
+          } else {
+            html += '<br>Nessun dato';
+          }
+          tip.style('display','block').html(html);
+        })
+        .on('mousemove', function(event) {
+          tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() { tip.style('display','none'); });
   });
 })();
 </script>
