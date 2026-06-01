@@ -251,6 +251,45 @@ async def ets_list(request: Request):
     })
 
 
+@app.get("/gruppi-regionali", response_class=HTMLResponse)
+async def gruppi_regionali(request: Request):
+    empty_ctx = {
+        "gruppi": [], "total": 0, "agganciati": 0, "non_agganciati": 0,
+        "active_page": "gruppi-regionali",
+    }
+    if not _db_exists():
+        return _tr(request, "gruppi_regionali.html", empty_ctx)
+
+    conn = get_db()
+    try:
+        if not _table_exists(conn, "gruppi_regionali_cai"):
+            return _tr(request, "gruppi_regionali.html", empty_ctx)
+
+        gruppi = conn.execute(
+            "SELECT g.gr_codice, g.gr_nome, "
+            "json_extract(g.gr_indirizzo_sede, '$.province') AS provincia, "
+            "g.gr_email, g.gr_telefono, g.gr_sito_web, g.gr_id_runts, "
+            "e.denominazione AS ente_denominazione "
+            "FROM gruppi_regionali_cai g "
+            "LEFT JOIN enti e ON g.gr_id_runts = e.id_runts "
+            "ORDER BY g.gr_nome"
+        ).fetchall()
+
+        total = len(gruppi)
+        agganciati = sum(1 for r in gruppi if r["gr_id_runts"] is not None)
+        non_agganciati = total - agganciati
+    finally:
+        conn.close()
+
+    return _tr(request, "gruppi_regionali.html", {
+        "gruppi": gruppi,
+        "total": total,
+        "agganciati": agganciati,
+        "non_agganciati": non_agganciati,
+        "active_page": "gruppi-regionali",
+    })
+
+
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
 async def ente_detail(request: Request, id_runts: str, back: Optional[str] = None):
     if not _db_exists():

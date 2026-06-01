@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Gruppi Regionali CAI — RUNTS · Sezioni CAI{% endblock %}
+{% block content %}
+<h1 class="h3 mb-1">Gruppi Regionali CAI</h1>
+<p class="text-muted mb-3">{{ total }} Gruppi Regionali — {{ agganciati }} agganciati a RUNTS, {{ non_agganciati }} non agganciati</p>
+
+{% if gruppi %}
+<div class="table-responsive">
+  <table class="table table-sm table-hover align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>Nome GR</th>
+        <th>Provincia</th>
+        <th>Email</th>
+        <th>Telefono</th>
+        <th>Sito web</th>
+        <th>Ente RUNTS</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in gruppi %}
+      <tr{% if g.gr_id_runts is none %} class="table-warning"{% endif %}>
+        <td>{{ g.gr_nome }}</td>
+        <td>{{ g.provincia or '—' }}</td>
+        <td>{{ g.gr_email or '—' }}</td>
+        <td>{{ g.gr_telefono or '—' }}</td>
+        <td>
+          {% if g.gr_sito_web %}
+            <a href="{{ g.gr_sito_web }}" target="_blank" rel="noopener">{{ g.gr_sito_web }}</a>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if g.gr_id_runts %}
+            <a href="/ente/{{ g.gr_id_runts }}">{{ g.ente_denominazione or g.gr_id_runts }}</a>
+          {% else %}
+            <span class="badge bg-warning text-dark">Non agganciato</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">Nessun dato disponibile. Eseguire <code>python3 -m scraper.cai_main</code> per popolare.</p>
+{% endif %}
+{% endblock %}
