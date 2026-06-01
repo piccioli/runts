@@ -169,7 +169,7 @@ async def enti_list(
 
         enti = conn.execute(
             f"SELECT s.codice_cai, s.cai_denominazione, s.cai_regione, "
-            f"json_extract(s.cai_indirizzo_sede, '$.city') AS comune, e.id_runts "
+            f"json_extract(s.cai_indirizzo_sede, '$.city') AS comune, e.id_runts, s.cai_match_note "
             f"FROM sezioni_cai s "
             f"LEFT JOIN enti e ON s.cai_codice_fiscale = e.codice_fiscale "
             f"{where_sql} ORDER BY s.cai_denominazione LIMIT ? OFFSET ?",

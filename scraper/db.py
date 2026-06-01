@@ -125,7 +125,8 @@ CREATE TABLE IF NOT EXISTS sezioni_cai (
     cai_lat               REAL,
     cai_lon               REAL,
     cai_regione           TEXT NOT NULL,
-    cai_scraped_at        TEXT
+    cai_scraped_at        TEXT,
+    cai_match_note        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_sezioni_cai_cf ON sezioni_cai(cai_codice_fiscale);

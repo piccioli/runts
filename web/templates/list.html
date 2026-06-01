@@ -78,7 +78,17 @@
               <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
                 {{ e.cai_denominazione }}
               </a>
+              {% if e.cai_match_note == 'exact_cf' %}
+              <span class="badge bg-success ms-1" title="Match esatto per codice fiscale">ETS</span>
+              {% elif e.cai_match_note == 'fuzzy_nome' %}
+              <span class="badge bg-success ms-1" title="Match per nome (CF assente nel registro CAI)">ETS</span>
+              <span class="badge bg-warning text-dark ms-1" title="CF non presente nel registro CAI — verificare">⚠ CF mancante CAI</span>
+              {% elif e.cai_match_note and e.cai_match_note.startswith('cf_mismatch') %}
               <span class="badge bg-success ms-1">ETS</span>
+              <span class="badge bg-danger ms-1" title="{{ e.cai_match_note }}">⚠ CF discordante</span>
+              {% else %}
+              <span class="badge bg-success ms-1">ETS</span>
+              {% endif %}
               {% else %}
               {{ e.cai_denominazione }}
               {% endif %}
