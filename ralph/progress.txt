@@ -1,3 +1,63 @@
+## 2026-06-01 - US-011
+- Added route GET `/stats` to `web/app.py`: iterates `["sezioni_cai", "enti", "allegati", "bilanci"]`, uses `_table_exists()` guard before COUNT(*), passes `counts` dict + `active_page='stats'`
+- Created `web/templates/stats.html`: title "Statistiche", subtitle "In costruzione", 4 Bootstrap cards in a responsive row grid (col-sm-6 col-lg-3) with colored display-6 numbers
+- Files changed: `web/app.py`, `web/templates/stats.html` (new)
+- **Learnings for future iterations:**
+  - Iterating over a list of table names and using `f"SELECT COUNT(*) FROM {table}"` avoids repeating boilerplate; `_table_exists()` guard makes it safe for empty DBs
+  - `counts` dict is passed as a single Jinja2 var and accessed as `counts.sezioni_cai` etc.
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-010
+- Added route GET `/gruppi-regionali` to `web/app.py`: SELECT with `json_extract(gr_indirizzo_sede, '$.province')` + LEFT JOIN enti; `active_page='gruppi-regionali'`
+- Created `web/templates/gruppi_regionali.html` with 6-column table (Nome GR, Provincia, Email, Telefono, Sito web, Ente RUNTS)
+- Rows with `gr_id_runts IS NULL` have `class="table-warning"`; badge `bg-warning text-dark` for non-agganciati
+- Empty-table message with `python3 -m scraper.cai_main` instruction
+- Files changed: `web/app.py`, `web/templates/gruppi_regionali.html` (new)
+- **Learnings for future iterations:**
+  - Province extracted via `json_extract(g.gr_indirizzo_sede, '$.province')` in SQL — consistent with `json_extract(s.cai_indirizzo_sede, '$.city')` pattern in sections list
+  - `empty_ctx` dict defined at top of route avoids repeating the dict in multiple early-return branches
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-009
+- Added `--no-groups` flag to `scraper/cai_main.py` argparse (default: GR fetch is enabled)
+- Added `_norm_name(s)` helper: lowercase, strip accents (NFD/Mn), remove non-alphanumeric, collapse whitespace
+- Added `_match_gr_to_enti(conn, gr)`: (1) exact CF match via SQL, (2) fuzzy SequenceMatcher ratio >= 0.5 over all enti.denominazione
+- GR block: fetch → match → set gr_id_runts → upsert; tracks scaricati/inseriti/aggiornati/agganciati
+- Report section printed only when `--no-groups` is not set
+- Files changed: `scraper/cai_main.py`
+- **Learnings for future iterations:**
+  - `difflib.SequenceMatcher(None, a, b).ratio()` is the standard fuzzy match; threshold 0.5 is permissive for short names
+  - Fuzzy match scans ALL enti rows (N=226 max) — acceptable for this scale, no index needed
+  - CF exact match takes priority; fuzzy only runs when `gr_codice_fiscale` is None
+  - `_norm_name` uses `unicodedata.normalize("NFD")` + Mn category filter for accent stripping (pure stdlib)
+---
+
+## 2026-06-01 - US-008
+- Added `fetch_regional_groups() -> list[dict]` to `scraper/cai_scraper.py`
+- Calls GET `https://www.cai.it/wp-json/cai-section/v2/regional-groups-list` with Origin/Referer headers
+- Normalizes API fields to `gr_` prefixed column names; serializes officeAddress/postalAddress as json.dumps()
+- Uses existing `_with_retry()` for max 3 retries with exponential backoff
+- Files changed: `scraper/cai_scraper.py`
+- **Learnings for future iterations:**
+  - Added `_REGIONAL_GROUPS_URL` constant alongside existing URL constants
+  - Pattern is identical to `fetch_all_sections()`: client with headers, `_with_retry()`, isinstance check, list comprehension
+  - `gr_id_runts` is NOT set here — it's populated by the matching logic in cai_main.py (US-009)
+---
+
+## 2026-06-01 - US-007
+- Added `CREATE TABLE IF NOT EXISTS gruppi_regionali_cai` to SCHEMA in `scraper/db.py` with 16 columns (gr_codice PRIMARY KEY + 15 fields)
+- Added `CREATE INDEX IF NOT EXISTS idx_gr_cai_cf ON gruppi_regionali_cai(gr_codice_fiscale)` to SCHEMA
+- Added migration entries to `_MIGRATIONS` for both the table DDL and the index
+- Implemented `upsert_gruppo_regionale(conn, data)` following the same INSERT OR REPLACE pattern as `upsert_sezione_cai()`
+- Files changed: `scraper/db.py`
+- **Learnings for future iterations:**
+  - New tables follow the pattern: add DDL to SCHEMA (for fresh DBs) + add same DDL to _MIGRATIONS (for existing DBs) + add index to both
+  - `upsert_gruppo_regionale` auto-sets `gr_scraped_at` to now if not provided (same as `cai_scraped_at` pattern)
+  - `gr_id_runts` is nullable — it gets populated by cai_main.py matching logic (US-009)
+---
+
 ## Codebase Patterns
 - Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
 - FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
