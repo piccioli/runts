@@ -325,4 +325,31 @@ var qualitaDati = {{ qualita_dati | tojson }};
   });
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Sezioni con più sottosezioni</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead><tr><th>#</th><th>Denominazione</th><th>Sottosezioni</th><th style="min-width:120px">Barra</th></tr></thead>
+      <tbody id="tbody-top10-sottosezioni"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+(function() {
+  var MAX_SS = 30;
+  var tbody = document.getElementById('tbody-top10-sottosezioni');
+  top10Sottosezioni.forEach(function(r, i) {
+    var pct = Math.round(r.n / MAX_SS * 100);
+    tbody.insertAdjacentHTML('beforeend',
+      '<tr>' +
+      '<td>' + (i+1) + '</td>' +
+      '<td><a href="/sezione/' + r.codice_cai + '?tab=sottosezioni">' + r.cai_denominazione + '</a></td>' +
+      '<td>' + r.n + '</td>' +
+      '<td><div class="progress" style="height:8px"><div class="progress-bar" style="width:' + pct + '%"></div></div></td>' +
+      '</tr>'
+    );
+  });
+})();
+</script>
 {% endblock %}
