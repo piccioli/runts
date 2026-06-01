@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ ente.denominazione }} — RUNTS CAI{% endblock %}
+{% block title %}{% if ente %}{{ ente.denominazione }}{% elif sezione_cai %}{{ sezione_cai.cai_denominazione }}{% else %}Sezione{% endif %} — RUNTS CAI{% endblock %}
 
 {% block head %}
 {% if lat and lon %}
@@ -13,59 +13,61 @@
 </div>
 
 <div class="card shadow-sm">
-  <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-    <h1 class="h5 mb-0">{{ ente.denominazione }}</h1>
-    <div class="d-flex gap-2">
-      <a href="/ente/{{ ente.id_runts }}/pdf" class="btn btn-sm btn-outline-light">
-        Scarica scheda PDF
-      </a>
-      {% if ente.url_dettaglio %}
-      <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">
-        Vedi su RUNTS ↗
-      </a>
+  <div class="card-header {% if ente %}bg-dark{% else %}bg-secondary{% endif %} text-white d-flex justify-content-between align-items-center">
+    <h1 class="h5 mb-0">
+      {% if ente %}{{ ente.denominazione }}{% else %}{{ sezione_cai.cai_denominazione }}{% endif %}
+    </h1>
+    <div class="d-flex gap-2 align-items-center">
+      {% if not ente %}
+      <span class="badge bg-light text-dark">Solo CAI — non registrata RUNTS</span>
+      {% endif %}
+      {% if ente %}
+      <a href="/ente/{{ ente.id_runts }}/pdf" class="btn btn-sm btn-outline-light">Scarica scheda PDF</a>
+      {% endif %}
+      {% if ente and ente.url_dettaglio %}
+      <a href="{{ ente.url_dettaglio }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-light">Vedi su RUNTS ↗</a>
       {% endif %}
     </div>
   </div>
 
-  <ul class="nav nav-tabs px-3 mb-0" id="enteTabs">
+  <ul class="nav nav-tabs px-3 mb-0" id="sezTabs">
     {% if sezione_cai %}
     <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'cai' %}active{% endif %}"
-         id="tab-cai" data-bs-toggle="tab" href="#cai">Dati CAI</a>
+      <a class="nav-link {% if active_tab == 'cai' %}active{% endif %}" id="tab-cai" data-bs-toggle="tab" href="#cai">Dati CAI</a>
+    </li>
+    {% endif %}
+    {% if ente %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'principale' %}active{% endif %}" id="tab-principale" data-bs-toggle="tab" href="#principale">Dati ETS</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'bilanci' %}active{% endif %}" id="tab-bilanci" data-bs-toggle="tab" href="#bilanci">Indicatori di bilancio</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'allegati' %}active{% endif %}" id="tab-allegati" data-bs-toggle="tab" href="#allegati">Atti e documenti</a>
     </li>
     {% endif %}
     <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'principale' %}active{% endif %}"
-         id="tab-principale" data-bs-toggle="tab" href="#principale">Dati principali</a>
+      <a class="nav-link {% if active_tab == 'mappa' %}active{% endif %}" id="tab-mappa" data-bs-toggle="tab" href="#mappa">Mappa</a>
     </li>
+    {% if sottosezioni %}
     <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'bilanci' %}active{% endif %}"
-         id="tab-bilanci" data-bs-toggle="tab" href="#bilanci">Indicatori di bilancio</a>
+      <a class="nav-link {% if active_tab == 'sottosezioni' %}active{% endif %}" id="tab-sottosezioni" data-bs-toggle="tab" href="#sottosezioni">Sottosezioni</a>
     </li>
-    <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'allegati' %}active{% endif %}"
-         id="tab-allegati" data-bs-toggle="tab" href="#allegati">Atti e documenti</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'mappa' %}active{% endif %}"
-         id="tab-mappa" data-bs-toggle="tab" href="#mappa">Mappa</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if active_tab == 'sottosezioni' %}active{% endif %}"
-         id="tab-sottosezioni" data-bs-toggle="tab" href="#sottosezioni">Sottosezioni</a>
-    </li>
+    {% endif %}
   </ul>
 
-  <div class="tab-content" id="enteTabContent">
+  <div class="tab-content" id="sezTabContent">
+
     {% if sezione_cai %}
     <div class="tab-pane {% if active_tab == 'cai' %}show active{% endif %} p-3" id="cai">
       {% include "partials/sezione_cai_card.html" %}
     </div>
     {% endif %}
-    <div class="tab-pane {% if active_tab == 'principale' %}show active{% endif %} p-3"
-         id="principale">
-      <dl class="row mb-0">
 
+    {% if ente %}
+    <div class="tab-pane {% if active_tab == 'principale' %}show active{% endif %} p-3" id="principale">
+      <dl class="row mb-0">
         {% set labels = {
           "codice_fiscale": "Codice fiscale",
           "forma_giuridica": "Forma giuridica",
@@ -84,38 +86,24 @@
           "sito_web": "Sito web",
           "settori_attivita": "Settori di attività"
         } %}
-
         {% for key, label in labels.items() %}
           {% if fields.get(key) %}
           <dt class="col-sm-4 col-md-3 text-muted small">{{ label }}</dt>
           <dd class="col-sm-8 col-md-9">
-            {% if key == "pec" %}
-              <a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
-            {% elif key == "sito_web" %}
-              <a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
-            {% else %}
-              {{ fields[key] }}
-            {% endif %}
+            {% if key == "pec" %}<a href="mailto:{{ fields[key] }}">{{ fields[key] }}</a>
+            {% elif key == "sito_web" %}<a href="{{ fields[key] }}" target="_blank" rel="noopener">{{ fields[key] }}</a>
+            {% else %}{{ fields[key] }}{% endif %}
           </dd>
           {% endif %}
         {% endfor %}
-
       </dl>
-
       {% if cariche %}
       <div class="mt-4">
         <h6 class="text-muted fw-semibold small text-uppercase mb-2">Persone e cariche</h6>
         <div class="table-responsive">
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light">
-              <tr>
-                <th>Ruolo</th>
-                <th>Nome</th>
-                <th>Cognome</th>
-                <th>Codice fiscale</th>
-                <th>Dal</th>
-                <th>Al</th>
-              </tr>
+              <tr><th>Ruolo</th><th>Nome</th><th>Cognome</th><th>CF</th><th>Dal</th><th>Al</th></tr>
             </thead>
             <tbody>
               {% for c in cariche %}
@@ -135,18 +123,12 @@
       {% endif %}
     </div>
 
-    <div class="tab-pane {% if active_tab == 'bilanci' %}show active{% endif %}"
-         id="bilanci">
+    <div class="tab-pane {% if active_tab == 'bilanci' %}show active{% endif %}" id="bilanci">
       {% if bilanci %}
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
-            <tr>
-              <th>Anno</th>
-              <th class="text-end">Totale proventi</th>
-              <th class="text-end">Totale oneri</th>
-              <th class="text-end">Risultato</th>
-            </tr>
+            <tr><th>Anno</th><th class="text-end">Totale proventi</th><th class="text-end">Totale oneri</th><th class="text-end">Risultato</th></tr>
           </thead>
           <tbody>
             {% for b in bilanci %}
@@ -156,9 +138,7 @@
               <td class="text-end">{{ b.totale_oneri | format_euro }}</td>
               <td class="text-end">
                 {% if b.risultato_esercizio is not none %}
-                  <span class="{{ 'text-danger' if b.risultato_esercizio < 0 else 'text-success' }}">
-                    {{ b.risultato_esercizio | format_euro }}
-                  </span>
+                <span class="{{ 'text-danger' if b.risultato_esercizio < 0 else 'text-success' }}">{{ b.risultato_esercizio | format_euro }}</span>
                 {% else %}—{% endif %}
               </td>
             </tr>
@@ -171,20 +151,12 @@
       {% endif %}
     </div>
 
-    <div class="tab-pane {% if active_tab == 'allegati' %}show active{% endif %}"
-         id="allegati">
+    <div class="tab-pane {% if active_tab == 'allegati' %}show active{% endif %}" id="allegati">
       {% if allegati %}
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
-            <tr>
-              <th>Tipo</th>
-              <th>Codice pratica</th>
-              <th>Anno</th>
-              <th>Dimensione</th>
-              <th>Download</th>
-              <th>RUNTS</th>
-            </tr>
+            <tr><th>Tipo</th><th>Codice pratica</th><th>Anno</th><th>Dimensione</th><th>Download</th><th>RUNTS</th></tr>
           </thead>
           <tbody>
             {% for att in allegati %}
@@ -194,18 +166,11 @@
               <td>{{ att.anno or "—" }}</td>
               <td class="small text-muted">{{ att.size | human_size }}</td>
               <td>
-                {% if att.path %}
-                <a href="/attachments/{{ ente.id_runts }}/{{ att.filename }}" class="btn btn-sm btn-outline-primary py-0">
-                  Scarica
-                </a>
-                {% else %}
-                <span class="text-muted small">{{ att.skip_reason or "—" }}</span>
-                {% endif %}
+                {% if att.path %}<a href="/attachments/{{ ente.id_runts }}/{{ att.filename }}" class="btn btn-sm btn-outline-primary py-0">Scarica</a>
+                {% else %}<span class="text-muted small">{{ att.skip_reason or "—" }}</span>{% endif %}
               </td>
               <td>
-                {% if att.url_originale %}
-                <a href="{{ att.url_originale }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0">↗</a>
-                {% endif %}
+                {% if att.url_originale %}<a href="{{ att.url_originale }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0">↗</a>{% endif %}
               </td>
             </tr>
             {% endfor %}
@@ -216,36 +181,28 @@
       <p class="text-muted p-3 mb-0">Nessun documento disponibile.</p>
       {% endif %}
     </div>
+    {% endif %}
 
-    <div class="tab-pane {% if active_tab == 'mappa' %}show active{% endif %}"
-         id="mappa">
+    <div class="tab-pane {% if active_tab == 'mappa' %}show active{% endif %}" id="mappa">
       {% if lat and lon %}
-      <div id="ente-map" style="height:450px; width:100%;"></div>
+      <div id="sez-map" style="height:450px; width:100%;"></div>
       {% else %}
       <p class="text-muted p-3 mb-0">Coordinate non disponibili.</p>
       {% endif %}
     </div>
 
-    <div class="tab-pane {% if active_tab == 'sottosezioni' %}show active{% endif %}"
-         id="sottosezioni">
+    <div class="tab-pane {% if active_tab == 'sottosezioni' %}show active{% endif %}" id="sottosezioni">
       {% if sottosezioni %}
       <div class="table-responsive">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light">
-            <tr>
-              <th>Nome</th>
-              <th>Comune</th>
-              <th>Telefono</th>
-              <th>Email</th>
-              <th>Soci</th>
-              <th>Anno fondazione</th>
-            </tr>
+            <tr><th>Nome</th><th>Comune</th><th>Telefono</th><th>Email</th><th>Soci</th><th>Fondazione</th></tr>
           </thead>
           <tbody>
             {% for ss in sottosezioni %}
             <tr>
               <td>{{ ss.cai_nome or "—" }}</td>
-              <td class="small text-muted">{{ ss.comune or "—" }}</td>
+              <td class="small text-muted">{{ ss.cai_comune or "—" }}</td>
               <td class="small">{{ ss.cai_telefono_sede or ss.cai_telefono or "—" }}</td>
               <td class="small">{{ ss.cai_email or "—" }}</td>
               <td>{{ ss.cai_soci if ss.cai_soci is not none else "—" }}</td>
@@ -259,12 +216,12 @@
       <p class="text-muted p-3 mb-0">Nessuna sottosezione registrata.</p>
       {% endif %}
     </div>
+
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-  document.querySelectorAll('#enteTabs [data-bs-toggle="tab"]').forEach(function(el) {
+  document.querySelectorAll('#sezTabs [data-bs-toggle="tab"]').forEach(function(el) {
     el.addEventListener('shown.bs.tab', function(e) {
       var slug = e.target.getAttribute('href').replace('#', '');
       var url = new URL(window.location.href);
@@ -278,25 +235,17 @@
 <script>
   var _mapInit = false;
   function _initMap() {
-    if (_mapInit) return;
-    _mapInit = true;
-    var m = L.map('ente-map').setView([{{ lat }}, {{ lon }}], 14);
+    if (_mapInit) return; _mapInit = true;
+    var m = L.map('sez-map').setView([{{ lat }}, {{ lon }}], 14);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 18
+      attribution: '© OpenStreetMap contributors', maxZoom: 18
     }).addTo(m);
-    L.marker([{{ lat }}, {{ lon }}]).addTo(m)
-      .bindPopup({{ ente.denominazione | tojson }})
-      .openPopup();
+    var label = {% if ente %}{{ ente.denominazione | tojson }}{% elif sezione_cai %}{{ sezione_cai.cai_denominazione | tojson }}{% else %}"Sezione"{% endif %};
+    L.marker([{{ lat }}, {{ lon }}]).addTo(m).bindPopup(label).openPopup();
   }
-  // Init immediately if mappa tab is already active (e.g. direct link ?tab=mappa)
-  if (document.getElementById('mappa').classList.contains('show')) {
-    _initMap();
-  }
-  // Lazy init when user clicks the Mappa tab
-  document.getElementById('tab-mappa').addEventListener('shown.bs.tab', function() {
-    _initMap();
-  });
+  if (document.getElementById('mappa') && document.getElementById('mappa').classList.contains('show')) _initMap();
+  var _tabMappa = document.getElementById('tab-mappa');
+  if (_tabMappa) _tabMappa.addEventListener('shown.bs.tab', _initMap);
 </script>
 {% endif %}
 {% endblock %}

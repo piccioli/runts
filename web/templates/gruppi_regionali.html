@@ -20,7 +20,7 @@
     <tbody>
       {% for g in gruppi %}
       <tr{% if g.gr_id_runts is none %} class="table-warning"{% endif %}>
-        <td>{{ g.gr_nome }}</td>
+        <td><a href="/gr/{{ g.gr_codice }}" class="text-decoration-none">{{ g.gr_nome }}</a></td>
         <td>{{ g.provincia or '—' }}</td>
         <td>{{ g.gr_email or '—' }}</td>
         <td>{{ g.gr_telefono or '—' }}</td>

@@ -80,7 +80,7 @@
             <td class="text-muted small">{{ e.codice_cai or "—" }}</td>
             <td>
               {% if e.id_runts %}
-              <a href="/ente/{{ e.id_runts | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
+              <a href="/sezione/{{ (e.codice_cai or e.id_runts) | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none">
                 {{ e.cai_denominazione }}
               </a>
               {% if e.cai_match_note == 'exact_cf' %}
@@ -95,7 +95,9 @@
               <span class="badge bg-success ms-1">ETS</span>
               {% endif %}
               {% else %}
-              {{ e.cai_denominazione }}
+              <a href="/sezione/{{ e.codice_cai | urlencode }}?back={{ back_url | urlencode }}" class="text-decoration-none text-secondary">
+                {{ e.cai_denominazione }}
+              </a>
               {% endif %}
             </td>
             <td>{{ e.comune or "—" }}</td>

@@ -12,6 +12,7 @@
         <th>Denominazione</th>
         <th>Comune</th>
         <th>Regione</th>
+        <th>CF RUNTS</th>
         <th>Codice CAI</th>
         <th>Status</th>
       </tr>
@@ -19,9 +20,10 @@
     <tbody>
       {% for e in enti %}
       <tr>
-        <td><a href="/ente/{{ e.id_runts }}">{{ e.denominazione }}</a></td>
+        <td><a href="/sezione/{% if e.codice_cai %}{{ e.codice_cai }}{% else %}{{ e.id_runts }}{% endif %}">{{ e.denominazione }}</a></td>
         <td>{{ e.sede_comune or '—' }}</td>
         <td>{{ e.sede_regione or '—' }}</td>
+        <td class="text-muted small font-monospace">{{ e.codice_fiscale or '—' }}</td>
         <td>{{ e.codice_cai or '—' }}</td>
         <td>
           {% if e.codice_cai is none %}
