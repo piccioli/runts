@@ -68,6 +68,12 @@
 
 ## TODO
 
+
+---
+
+## DONE
+
+REV 002:
 - `[scraper]` **Documenti allegati** Scaricare i documenti allegati alle pagine RUNTS asociandoli ai rispettivi enti 
 - `[scraper]` **Analisi Documenti allegati** Analizzare i documenti allegati di bilancio e patrimonio per aggiungere informazioni alla scheda ente 
 - `[scraper]` **Presidente** Recuperare le informazioni che riguardano il presidente dell'Ente e salvarle nel DB
@@ -77,11 +83,6 @@
 - `[web][ux]` **Allegati RUNTS** Mostrare nella scheda ente i metadati relativi agli allegati scaricati
 - `[web][ux]` **Persone** Mostrare nella scheda ente i metadati relativi agli allegati scaricati
 - `[web][ux]` **PDF** Aggiornare il PDF scaricabile dall'ente con info relative Allegati / Metadati allegati / Persone
-
-
----
-
-## DONE
 
 REV 001:
 - `[web][ux]` Mappa con **tutti gli enti del filtro corrente**, non solo quelli della pagina. Endpoint dedicato `/api/enti.geojson?<filtri>` o array JSON inline più ampio. Oggi la mappa nella lista mostra solo 20 marker per pagina ed è poco utile per la visione d'insieme.

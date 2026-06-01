@@ -289,22 +289,28 @@ _NUMERIC_BILANCIO_COLS = [
 def upsert_bilancio(conn: sqlite3.Connection, data: dict) -> None:
     """Upsert a bilancio record by (id_runts, anno).
 
-    Never overwrites a record that has numeric fields with one that has none.
+    Merges with any existing record: each numeric field is updated only if the
+    incoming value is not None (best-of-all-files wins per field).
     """
     now = datetime.now(timezone.utc).isoformat()
     cols = ["id_runts", "anno"] + _NUMERIC_BILANCIO_COLS + ["raw_text", "allegato_id", "analyzed_at"]
     row = {c: data.get(c) for c in cols}
     row["analyzed_at"] = now
 
-    new_has_data = any(row.get(c) is not None for c in _NUMERIC_BILANCIO_COLS)
+    existing = conn.execute(
+        f"SELECT {', '.join(cols)} FROM bilanci WHERE id_runts = ? AND anno = ?",
+        (row["id_runts"], row["anno"]),
+    ).fetchone()
 
-    if not new_has_data:
-        existing = conn.execute(
-            "SELECT 1 FROM bilanci WHERE id_runts = ? AND anno = ? AND totale_proventi IS NOT NULL",
-            (row["id_runts"], row["anno"]),
-        ).fetchone()
-        if existing:
-            return
+    if existing:
+        existing_row = dict(zip(cols, existing))
+        # Merge: keep existing value when new is None; prefer new when new is not None
+        for c in _NUMERIC_BILANCIO_COLS:
+            if row[c] is None:
+                row[c] = existing_row[c]
+        # Keep raw_text if new is empty
+        if not (row.get("raw_text") or "").strip():
+            row["raw_text"] = existing_row.get("raw_text")
 
     conn.execute(
         f"INSERT OR REPLACE INTO bilanci ({', '.join(cols)}) "

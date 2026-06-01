@@ -256,37 +256,65 @@ async def _playwright_download_allegati(
 
             suggested = download.suggested_filename or f"allegato_{idx}.pdf"
             base_name = f"{att.get('codice_pratica','XX')}_{att.get('anno') or 'nd'}_{suggested}"
+
+            # Save to a hidden temp file that preserves the extension (needed for .p7m check)
+            tmp_path = dest_dir / f".dl_{idx}_{base_name}"
+            await download.save_as(str(tmp_path))
+
+            # Unwrap CAdES .p7m envelope → plain PDF
+            if tmp_path.suffix.lower() == ".p7m":
+                try:
+                    tmp_path = _strip_p7m(tmp_path)
+                    base_name = _Path(base_name).stem  # drop .p7m, keep stem
+                    logger.info("  Estratto da .p7m → %s", base_name)
+                except Exception as exc:
+                    logger.warning("  Conversione .p7m fallita per %s: %s", base_name, exc)
+
+            new_size = tmp_path.stat().st_size
+            hasher = hashlib.sha256()
+            with open(tmp_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    hasher.update(chunk)
+            new_hash = hasher.hexdigest()
+
+            # If base_name already on disk with identical content → reuse, skip copy
+            base_path = dest_dir / base_name
+            if base_path.exists() and base_name not in used_names:
+                existing_hasher = hashlib.sha256()
+                with open(base_path, "rb") as f:
+                    for chunk in iter(lambda: f.read(65536), b""):
+                        existing_hasher.update(chunk)
+                if existing_hasher.hexdigest() == new_hash:
+                    tmp_path.unlink(missing_ok=True)
+                    used_names.add(base_name)
+                    enriched.append({
+                        **att,
+                        "filename": base_name,
+                        "path": str(base_path),
+                        "size": new_size,
+                        "hash_sha256": new_hash,
+                        "mime": "application/pdf",
+                        "url_originale": None,
+                    })
+                    logger.info("↓ Cache hit (disco): %s", base_name)
+                    continue
+
+            # Determine final filename, handle within-batch collisions
             filename = base_name
             counter = 2
             while filename in used_names or (dest_dir / filename).exists():
-                stem, ext = filename.rsplit(".", 1) if "." in filename else (filename, "")
                 filename = f"{base_name.rsplit('.', 1)[0]}_{counter}.{base_name.rsplit('.', 1)[1]}" if "." in base_name else f"{base_name}_{counter}"
                 counter += 1
             used_names.add(filename)
-
             save_path = dest_dir / filename
-            await download.save_as(str(save_path))
-
-            # Unwrap CAdES .p7m envelope → plain PDF
-            if save_path.suffix.lower() == ".p7m":
-                try:
-                    save_path = _strip_p7m(save_path)
-                    filename = save_path.name
-                    logger.info("  Estratto da .p7m → %s", filename)
-                except Exception as exc:
-                    logger.warning("  Conversione .p7m fallita per %s: %s", filename, exc)
-
-            hasher = hashlib.sha256()
-            with open(save_path, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    hasher.update(chunk)
+            tmp_path.rename(save_path)
 
             enriched.append({
                 **att,
                 "filename": filename,
                 "path": str(save_path),
-                "size": save_path.stat().st_size,
-                "hash_sha256": hasher.hexdigest(),
+                "size": new_size,
+                "hash_sha256": new_hash,
                 "mime": "application/pdf",
                 "url_originale": None,
             })

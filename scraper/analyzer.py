@@ -13,63 +13,79 @@ logger = logging.getLogger(__name__)
 _PATTERNS: dict[str, list[str]] = {
     "oneri_a_interesse_generale": [
         # Rendiconto di cassa (subtotal row): "Totale uscite da attività di interesse generale 122.929"
-        r"[Tt]otale uscite da attivit[^\n]{1,20}interesse generale\s+([\d\.,]+)",
+        r"[Tt]otale uscite da attivit[^\n]{1,20}interesse generale\s+([\d\.,']+)",
         # Mod.B standard: "A) Costi e oneri da attività di interesse generale ... 502.912,98"
         r"A\)\s*[Cc]osti e oneri da attivit[àa] di interesse generale[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "oneri_b_attivita_diverse": [
-        r"[Tt]otale uscite da attivit[\wà\.]{1,20} diverse\s+([\d\.,]+)",
+        r"[Tt]otale uscite da attivit[\wà\.]{1,20} diverse\s+([\d\.,']+)",
         r"B\)\s*[Cc]osti e oneri da attivit[àa] diverse[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "oneri_c_raccolta_fondi": [
-        r"[Tt]otale uscite da attivit[\wà\.]{1,20} di raccolta fondi\s+([\d\.,]+)",
+        r"[Tt]otale uscite da attivit[\wà\.]{1,20} di raccolta fondi\s+([\d\.,']+)",
         r"C\)\s*[Cc]osti e oneri da attivit[àa] di raccolta fondi[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "oneri_d_finanziarie_patrimoniali": [
-        r"[Tt]otale uscite da attivit[\wà\.]{1,20} finanziarie e patrimoniali\s+([\d\.,]+)",
+        r"[Tt]otale uscite da attivit[\wà\.]{1,20} finanziarie e patrimoniali\s+([\d\.,']+)",
         r"D\)\s*[Cc]osti e oneri da attivit[àa] finanziarie e patrimoniali[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "oneri_e_supporto_generale": [
-        r"[Tt]otale uscite di supporto generale\s+([\d\.,]+)",
+        r"[Tt]otale uscite di supporto generale\s+([\d\.,']+)",
         r"E\)\s*[Cc]osti e oneri di supporto generale[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "totale_oneri": [
-        r"[Tt]otale uscite della gestione\s+([\d\.,]+)",
+        r"[Tt]otale uscite della gestione\s+([\d\.,']+)",
+        # Mod.B ordinaria/OCR: "Totale oneri e costi] 240.079,57 €" or "Totale oneri e costi  339.386"
+        r"[Tt]otale\s+oneri\s+e\s+costi[^\d\n]{0,20}([\d\.,']+)",
         r"[Tt]otale [Oo]neri e [Cc]osti(?!\s*x\s*1)[\s\S]{0,200}?([\d\.\s]+,\d{2})",
+        # Mod.D OCR: "Totale uscite 123.456,78" or "Totale Uscite 123456,78"
+        r"[Tt]otale\s+[Uu]scite\b[^\d\n]{0,30}([\d\.,' ]+[,\.]\d{2})",
+        # Bologna GR Mod.B image: grand total label
+        r"TOTALE\s+ONERI\s+E\s+COSTI[^\d\n]{0,30}([\d\.,' ]+[,\.]\d{2})",
     ],
     "proventi_a_interesse_generale": [
-        r"[Tt]otale entrate da attivit[^\n]{1,20}interesse generale\s+([\d\.,]+)",
+        r"[Tt]otale entrate da attivit[^\n]{1,20}interesse generale\s+([\d\.,']+)",
         r"A\)\s*[Rr]icavi[,\s].*?proventi da attivit[àa] di interesse generale[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "proventi_b_attivita_diverse": [
-        r"[Tt]otale entrate da attivit[\wà\.]{1,20} diverse\s+([\d\.,]+)",
+        r"[Tt]otale entrate da attivit[\wà\.]{1,20} diverse\s+([\d\.,']+)",
         r"B\)\s*[Rr]icavi[,\s].*?proventi da attivit[àa] diverse[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "proventi_c_raccolta_fondi": [
-        r"[Tt]otale entrate da attivit[\wà\.]{1,20} di raccolta fondi\s+([\d\.,]+)",
+        r"[Tt]otale entrate da attivit[\wà\.]{1,20} di raccolta fondi\s+([\d\.,']+)",
         r"C\)\s*[Rr]icavi e proventi da attivit[àa] di raccolta fondi[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "proventi_d_finanziarie_patrimoniali": [
-        r"[Tt]otale entrate da attivit[\wà\.]{1,20} finanziarie e patrimoniali\s+([\d\.,]+)",
+        r"[Tt]otale entrate da attivit[\wà\.]{1,20} finanziarie e patrimoniali\s+([\d\.,']+)",
         r"D\)\s*[Rr]icavi e proventi da attivit[àa] finanziarie e patrimoniali[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "proventi_e_supporto_generale": [
-        r"[Tt]otale entrate di supporto generale\s+([\d\.,]+)",
+        r"[Tt]otale entrate di supporto generale\s+([\d\.,']+)",
         r"E\)\s*[Pp]roventi di supporto generale[\s\S]{0,500}?([\d\.\s]+,\d{2})",
     ],
     "totale_proventi": [
-        r"[Tt]otale entrate della gestione\s+([\d\.,]+)",
+        r"[Tt]otale entrate della gestione\s+([\d\.,']+)",
+        # Totale proventi e ricavi — standalone o in linea dopo totale oneri
+        r"[Tt]otale\s+proventi\s+e\s+ricavi[^\d\n]{0,20}([\d\.,']+)",
         r"[Tt]otale [Pp]roventi e [Rr]icavi(?!\s*x\s*1)[\s\S]{0,200}?([\d\.\s]+,\d{2})",
+        # Mod.D OCR
+        r"[Tt]otale\s+[Ee]ntrate\b[^\d\n]{0,30}([\d\.,' ]+[,\.]\d{2})",
+        # Bologna GR Mod.B image
+        r"TOTALE\s+PROVENTI\s+E\s+RICAVI[^\d\n]{0,30}([\d\.,' ]+[,\.]\d{2})",
     ],
     "risultato_ante_imposte": [
-        r"[Aa]vanzo/disavanzo d.esercizio prima delle imposte[^0-9]+([\d\.,]+)",
+        r"[Aa]vanzo/disavanzo d.esercizio prima delle imposte[^0-9]+([\d\.,']+)",
+        r"(?:[Aa]vanzo|[Dd]isavanzo).{1,30}prima[^\d\n]{0,30}([\d\.,']+)",
+        r"(?:[Dd]isavanzo|[Aa]vanzo)\s+d.esercizio\s+prima\b[^\d\n]{0,30}([\d\.,']+)",
         r"(?:[Dd]isavanzo|[Aa]vanzo)\s+(?:prima|ante)\s+(?:delle\s+)?imposte[\s\S]{0,200}?([\d\.\s]+,\d{2})",
     ],
     "imposte": [
-        r"\bImposte\s+([\d\.,]+)",
+        r"\bImposte\s+([\d\.,']+)",
     ],
     "risultato_esercizio": [
-        r"[Aa]vanzo/disavanzo complessivo[^0-9]+([\d\.,]+)",
+        r"[Aa]vanzo/disavanzo complessivo[^0-9]+([\d\.,']+)",
+        # Mod.B ordinaria: "Avanzo/disavanzo d'esercizio (+/-) 31.275"
+        r"[Aa]vanzo/disavanzo d.esercizio\s+\(\+/-\)[^\d\n]{0,10}([\d\.,']+)",
         r"(?:[Dd]isavanzo|[Aa]vanzo)\s+(?:dopo|netto)\s+(?:le\s+)?imposte[\s\S]{0,200}?([\d\.\s]+,\d{2})",
     ],
 }
@@ -110,12 +126,73 @@ def parse_italian_number(s: str) -> float | None:
         return None
 
 
-def extract_bilancio_pdf(path: str) -> dict:
-    """Extract 13 ETS financial fields from a PDF. Returns dict with field→float|None."""
+def _ocr_pdf(path: str) -> str:
+    """OCR a scanned PDF using tesseract CLI (Italian, auto-rotation per page).
+
+    Uses subprocess + temp files in the project dir to avoid sandbox /tmp restrictions.
+    """
+    import subprocess
+    import tempfile
+
+    try:
+        from pdf2image import convert_from_path
+    except ImportError:
+        logger.warning("pdf2image non installato — OCR non disponibile")
+        return ""
+
+    # Use a temp dir inside the project to avoid sandbox restrictions on /tmp
+    project_dir = Path(path).resolve().parent.parent
+    ocr_tmp_dir = project_dir / ".ocr_tmp"
+    ocr_tmp_dir.mkdir(exist_ok=True)
+
+    try:
+        images = convert_from_path(path, dpi=200)
+    except Exception as exc:
+        logger.warning("pdf2image errore su %s: %s", path, exc)
+        return ""
+
+    pages_text = []
+    for i, img in enumerate(images):
+        img_path = ocr_tmp_dir / f"page_{i}.png"
+        out_base = str(ocr_tmp_dir / f"page_{i}_out")
+        try:
+            img.save(str(img_path))
+            result = subprocess.run(
+                ["tesseract", str(img_path), out_base, "-l", "ita", "--psm", "6"],
+                capture_output=True, timeout=120,
+            )
+            if result.returncode == 0:
+                out_file = Path(out_base + ".txt")
+                txt = out_file.read_text(encoding="utf-8", errors="replace") if out_file.exists() else ""
+                pages_text.append(txt)
+                logger.debug("OCR pag %d: %d chars", i + 1, len(txt))
+            else:
+                logger.warning("OCR errore pag %d di %s: %s", i + 1, path,
+                               result.stderr.decode("utf-8", "replace")[:100])
+        except Exception as exc:
+            logger.warning("OCR errore pag %d di %s: %s", i + 1, path, exc)
+        finally:
+            img_path.unlink(missing_ok=True)
+            Path(out_base + ".txt").unlink(missing_ok=True)
+
+    try:
+        ocr_tmp_dir.rmdir()
+    except OSError:
+        pass
+
+    return "\n".join(pages_text)
+
+
+def extract_bilancio_pdf(path: str, ocr_fallback: bool = True) -> dict:
+    """Extract 13 ETS financial fields from a PDF. Returns dict with field→float|None.
+
+    Falls back to OCR (tesseract) when pdfplumber extracts no text (scanned PDFs).
+    """
     import pdfplumber
 
     result: dict[str, float | None] = {k: None for k in _PATTERNS}
     raw_text = ""
+    used_ocr = False
 
     try:
         with pdfplumber.open(path) as pdf:
@@ -126,7 +203,13 @@ def extract_bilancio_pdf(path: str) -> dict:
             raw_text = "\n".join(pages_text)
     except Exception as exc:
         logger.warning("Errore apertura PDF %s: %s", path, exc)
-        return {**result, "_raw_text": ""}
+        return {**result, "_raw_text": "", "_ocr": False}
+
+    # If pdfplumber got nothing, try OCR
+    if not raw_text.strip() and ocr_fallback:
+        logger.info("  Testo vuoto — avvio OCR su %s", Path(path).name)
+        raw_text = _ocr_pdf(path)
+        used_ocr = True
 
     for field, patterns in _PATTERNS.items():
         for pattern in patterns:
@@ -139,6 +222,7 @@ def extract_bilancio_pdf(path: str) -> dict:
                     break
 
     result["_raw_text"] = raw_text[:50000]
+    result["_ocr"] = used_ocr
     return result
 
 
@@ -175,7 +259,7 @@ def main() -> None:
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
 
-    where_clauses = ["a.tipo IN ('bilancio_esercizio', 'situazione_patrimoniale')", "a.path IS NOT NULL", "a.anno IS NOT NULL"]
+    where_clauses = ["a.tipo = 'bilancio_esercizio'", "a.path IS NOT NULL", "a.anno IS NOT NULL"]
     params: list = []
 
     if args.id_runts:
@@ -212,6 +296,7 @@ def main() -> None:
         _check_coherence(result, _PROVENTI_SUBTOTALS, "totale_proventi")
 
         raw_text = result.pop("_raw_text", "")
+        used_ocr = result.pop("_ocr", False)
         numeric_fields = [k for k in result if result[k] is not None]
 
         data = {
@@ -229,11 +314,12 @@ def main() -> None:
             failed += 1
             continue
 
+        ocr_tag = " [OCR]" if used_ocr else ""
         if numeric_fields:
-            logger.info("✓ %s anno %s — %d campi estratti", row["id_runts"], row["anno"], len(numeric_fields))
+            logger.info("✓ %s anno %s — %d campi estratti%s", row["id_runts"], row["anno"], len(numeric_fields), ocr_tag)
             success += 1
         else:
-            logger.info("~ %s anno %s — solo raw_text (nessun campo numerico)", row["id_runts"], row["anno"])
+            logger.info("~ %s anno %s — solo raw_text (nessun campo numerico)%s", row["id_runts"], row["anno"], ocr_tag)
             partial += 1
 
     conn.close()
