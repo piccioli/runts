@@ -16,6 +16,7 @@ _REGIONS = [
 ]
 
 _SECTIONS_URL = "https://www.cai.it/wp-json/cai-section/v2/sections-list-simple"
+_SUBSECTIONS_URL = "https://www.cai.it/wp-json/cai-section/v2/sections/{code}/sub-sections-list"
 _MAX_RETRIES = 3
 
 
@@ -58,6 +59,53 @@ def _normalize_section(raw: dict, regione: str) -> dict:
         "cai_regione": regione,
         "cai_scraped_at": datetime.now(timezone.utc).isoformat(),
     }
+
+
+def _normalize_subsection(raw: dict, codice_sezione: str) -> dict:
+    """Map API response fields to sottosezioni_cai column names."""
+    office_addr = raw.get("officeAddress") or raw.get("office_address")
+    return {
+        "cai_codice": raw.get("code") or raw.get("id"),
+        "cai_sezione_codice": codice_sezione,
+        "cai_nome": raw.get("name") or raw.get("nome") or "",
+        "cai_email": raw.get("email"),
+        "cai_telefono_sede": raw.get("officePhone") or raw.get("office_phone"),
+        "cai_telefono": raw.get("phone"),
+        "cai_indirizzo_sede": json.dumps(office_addr, ensure_ascii=False) if office_addr is not None else None,
+        "cai_sito_web": raw.get("website") or raw.get("sito_web"),
+        "cai_orari": raw.get("hours") or raw.get("orari"),
+        "cai_avvisi": raw.get("notices") or raw.get("avvisi"),
+        "cai_anno_fondazione": raw.get("foundingYear") or raw.get("founding_year"),
+        "cai_soci": raw.get("lastYearMembers") or raw.get("members") or raw.get("soci"),
+        "cai_lat": raw.get("lat"),
+        "cai_lon": raw.get("lon"),
+        "cai_scraped_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def fetch_subsections(codice_sezione: str) -> list[dict]:
+    """Fetch sub-sections for a given CAI section code."""
+    url = _SUBSECTIONS_URL.format(code=codice_sezione)
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            def _fetch(u: str = url, c: httpx.Client = client) -> Any:
+                resp = c.get(u, headers={"Origin": "https://www.cai.it"})
+                if resp.status_code == 404:
+                    return []
+                resp.raise_for_status()
+                return resp.json()
+
+            data = _with_retry(_fetch)
+    except Exception as exc:
+        logger.error("Failed to fetch subsections for %s: %s", codice_sezione, exc)
+        return []
+
+    if not data:
+        return []
+    if not isinstance(data, list):
+        logger.warning("Unexpected response type for subsections of %s: %s", codice_sezione, type(data).__name__)
+        return []
+    return [_normalize_subsection(raw, codice_sezione) for raw in data]
 
 
 def fetch_all_sections() -> list[dict]:
