@@ -1,5 +1,17 @@
 {% extends "base.html" %}
 {% block title %}Statistiche — RUNTS · Sezioni CAI{% endblock %}
+{% block head %}
+<script>
+var sociRegione = {{ soci_per_regione | tojson }};
+var proventi2024Regione = {{ proventi_2024_per_regione | tojson }};
+var top10Soci = {{ top10_soci | tojson }};
+var top10Sottosezioni = {{ top10_sottosezioni | tojson }};
+var allegatiPerTipo = {{ allegati_per_tipo | tojson }};
+var bilanciEnte = {{ bilanci_per_ente | tojson }};
+var copertura = {{ copertura_ets | tojson }};
+var qualitaDati = {{ qualita_dati | tojson }};
+</script>
+{% endblock %}
 {% block content %}
 <h1 class="h3 mb-4">Statistiche</h1>
 
