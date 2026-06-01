@@ -58,6 +58,74 @@
   - `gr_id_runts` is nullable — it gets populated by cai_main.py matching logic (US-009)
 ---
 
+## 2026-06-01 - US-012 (ralph/stats branch)
+- Added D3.js 7 CDN `<script src="https://cdn.jsdelivr.net/npm/d3@7">` to `{% block head %}` in stats.html
+- Added `<div id="map-regioni" style="height:420px">` section in stats.html
+- D3 choropleth: loads `/static/it-regions.geojson`, `d3.geoMercator()` centered at [12.5, 42] (Italy), `d3.scaleSequential(d3.interpolateBlues)` scaled 0→max(n_sezioni)
+- NORM dict maps GeoJSON names to DB uppercase names (Valle d'Aosta, Trentino-Alto Adige, Friuli Venezia Giulia, Emilia-Romagna are the 4 cases needing normalization)
+- Tooltip on hover: div appended to body, shown on mouseover/mousemove, hidden on mouseout
+- Regions with no DB data colored `#eee`
+- Files changed: `web/templates/stats.html`
+- **Learnings for future iterations:**
+  - geoBoundaries ADM2 uses plain Italian names (NOT NUTS bilingual); only 4 regions need normalization to match DB uppercase
+  - D3 tooltip must be appended to `body` (not the SVG container) to avoid clipping
+  - `d3.json()` returns a promise — chain with `.then()`; no async/await in plain script blocks
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-01 - US-011 (ralph/stats branch)
+- Added qualità dati table to stats.html: 4 rows (sezioni no CF, ETS non agganciati, sezioni no soci, GR non agganciati)
+- Badge bg-warning if n>0, bg-success if n=0; "Vedi →" link column
+- Data from `qualitaDati` JS var (set in {% block head %})
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-010 (ralph/stats branch)
+- Added top 10 sottosezioni table to stats.html: Pos, Denominazione (link ?tab=sottosezioni), N, progress bar (max=30 Bergamo)
+- Data from `top10Sottosezioni` JS var
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-009 (ralph/stats branch)
+- Added donut chart `chart-allegati-tipo` to stats.html using Chart.js doughnut type
+- 8 Bootstrap-palette colors; legend on right showing tipo + count
+- Data from `allegatiPerTipo` JS var
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-008 (ralph/stats branch)
+- Added line chart with entity selector to stats.html
+- `<select id="sel-ente">` populated from `bilanciEnte`; updates chart on change without page reload
+- Line chart with fill and tension; tooltip formats as €
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-007 (ralph/stats branch)
+- Added vertical bar chart `chart-proventi-regione` to stats.html (Chart.js vertical bar, color rgba(25,135,84,0.7))
+- Y-axis tick formatted as €Xk/€XM; tooltip formats full euro amount
+- Note: "Dati parziali — solo enti con bilancio 2024 analizzato"
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-006 (ralph/stats branch)
+- Added copertura ETS progress bars section to stats.html (4 items, dynamic color bg-success/warning/danger)
+- Data from `copertura` JS var; color threshold: >=80% success, 20-79% warning, <20% danger
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-005 (ralph/stats branch)
+- Added top 10 soci table to stats.html: Bootstrap table-sm with Pos, Denominazione (link), Soci, progress bar
+- Progress bar width = soci/28992*100 (SAT max); data from `top10Soci` JS var
+- Files changed: `web/templates/stats.html`
+---
+
+## 2026-06-01 - US-004 (ralph/stats branch)
+- Added Chart.js CDN to `{% block head %}` in stats.html
+- Added horizontal bar chart `chart-soci-regione`: indexAxis='y', data sorted DESC, rgba(13,110,253,0.7)
+- Tooltip: 'X soci — Y sezioni'
+- Files changed: `web/templates/stats.html`
+---
+
 ## 2026-06-01 - US-003 (ralph/stats branch)
 - Downloaded Italian regions GeoJSON from geoBoundaries API (openpolis URL in PRD returns 404 — repo does not exist)
 - Used geoboundaries.org API: `GET /api/current/gbOpen/ITA/ADM2/` → `gjDownloadURL` → ADM2 = 20 Italian regions
