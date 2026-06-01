@@ -178,4 +178,53 @@ var qualitaDati = {{ qualita_dati | tojson }};
   document.getElementById('copertura-rows').innerHTML = html;
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Proventi ETS 2024 per regione</div>
+  <div class="card-body">
+    <canvas id="chart-proventi-regione"></canvas>
+    <p class="text-muted small mt-2 mb-0">Dati parziali — solo enti con bilancio 2024 analizzato</p>
+  </div>
+</div>
+<script>
+(function() {
+  if (!proventi2024Regione.length) return;
+  var labels = proventi2024Regione.map(function(r) { return r.sede_regione; });
+  var data = proventi2024Regione.map(function(r) { return r.totale_proventi; });
+  new Chart(document.getElementById('chart-proventi-regione'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: 'rgba(25,135,84,0.7)',
+        borderWidth: 0
+      }]
+    },
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              var v = ctx.parsed.y;
+              return '€ ' + v.toLocaleString('it-IT', {minimumFractionDigits: 0, maximumFractionDigits: 0});
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: function(v) {
+              return '€ ' + (v/1000000).toFixed(1) + 'M';
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+</script>
 {% endblock %}
