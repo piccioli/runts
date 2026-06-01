@@ -290,6 +290,20 @@ async def gruppi_regionali(request: Request):
     })
 
 
+@app.get("/stats", response_class=HTMLResponse)
+async def stats(request: Request):
+    counts = {"sezioni_cai": 0, "enti": 0, "allegati": 0, "bilanci": 0}
+    if _db_exists():
+        conn = get_db()
+        try:
+            for table in counts:
+                if _table_exists(conn, table):
+                    counts[table] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        finally:
+            conn.close()
+    return _tr(request, "stats.html", {"counts": counts, "active_page": "stats"})
+
+
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
 async def ente_detail(request: Request, id_runts: str, back: Optional[str] = None):
     if not _db_exists():
