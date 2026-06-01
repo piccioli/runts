@@ -38,6 +38,21 @@
 - `[data]` **Open Data export** del dataset completo come dump CSV/JSON aggiornato giornalmente, scaricabile da `/data/runts-cai-latest.csv`.
 - `[data]` **Diff/notifica** quando nuovi enti compaiono o spariscono dal RUNTS rispetto all'esecuzione precedente.
 
+### Statistiche (`/stats`) — idee basate sui dati presenti
+
+*Dati disponibili al 2026-06-01: 529 sezioni CAI, 226 enti ETS, 224 sottosezioni, 367.665 soci totali, 235 allegati (0.23 GB), bilanci 2021-2025 su 20 enti.*
+
+- `[web][ux]` **KPI riepilogo** Card con i numeri chiave: sezioni totali, enti ETS, soci totali CAI, GR agganciati/totali, copertura bilanci (oggi 20/226 = 8.8%).
+- `[web][ux]` **Mappa coropleta regioni** Colora le regioni italiane per numero di sezioni CAI (Lombardia 152, Piemonte 83, Veneto 65…). Chart.js o D3 via CDN. Dati già in `sezioni_cai.cai_regione`.
+- `[web][ux]` **Grafico soci per regione** Bar chart orizzontale: somma `cai_soci_ultimo_anno` per `cai_regione`. Evidenzia che SAT (Trentino) da sola ha 28.992 soci.
+- `[web][ux]` **Top 10 sezioni per soci** Tabella classifica con sparkline o barra progress. Dati: `SELECT cai_denominazione, cai_soci_ultimo_anno FROM sezioni_cai ORDER BY cai_soci_ultimo_anno DESC LIMIT 10`.
+- `[web][ux]` **Copertura dati ETS** Gauge o progress bar: su 226 enti ETS, quanti hanno bilanci analizzati (20), allegati scaricati (21), coordinate (226), CF agganciato a sezione CAI (195/184).
+- `[web][ux]` **Distribuzione proventi ETS per regione** Somma `totale_proventi` anno 2024 per regione degli enti ETS: Reggio Emilia 794k, Parma 453k, Bologna M.Fantin 371k… Bar chart ordinato.
+- `[web][ux]` **Evoluzione proventi nel tempo** Line chart multi-ente: asse X = anno (2021-2025), asse Y = totale proventi. Selezione enti tramite checkbox. Dati in `bilanci`.
+- `[web][ux]` **Qualità dati** Tabella con 4 righe di problemi: sezioni senza CF CAI (6), enti ETS non agganciati a sezione (31), sezioni senza soci (6), GR non agganciati RUNTS (16). Ogni voce è link al filtro corrispondente.
+- `[web][ux]` **Distribuzione per tipo allegato** Donut chart: bilancio_esercizio 103, altro 31, atto_costitutivo 20, provvedimento_iscrizione 20, statuto 20…
+- `[web][ux]` **Sezioni con più sottosezioni** Top 10 sezioni per numero di sottosezioni (Bergamo 30, Milano 10, Brescia 10…). Dati in `sottosezioni_cai`.
+
 ### Dev experience
 - `[devx]` **Test end-to-end della web app** con `httpx` async client + DB SQLite di test in memoria.
 - `[devx]` **Pre-commit hooks**: `ruff`, `black`, `mypy` su scraper e web.
