@@ -148,4 +148,34 @@ var qualitaDati = {{ qualita_dati | tojson }};
   });
 })();
 </script>
+
+<div class="card mb-4">
+  <div class="card-header fw-semibold">Copertura dati ETS</div>
+  <div class="card-body">
+    <div id="copertura-rows"></div>
+  </div>
+</div>
+<script>
+(function() {
+  var tot = copertura.totale || 226;
+  var items = [
+    { label: 'Agganciati a sezione CAI',    n: copertura.agganciati },
+    { label: 'Con bilanci analizzati',       n: copertura.con_bilanci },
+    { label: 'Con allegati scaricati',       n: copertura.con_allegati },
+    { label: 'Con coordinate geografiche',   n: copertura.con_coordinate }
+  ];
+  var html = '';
+  items.forEach(function(item) {
+    var pct = tot ? Math.round(item.n / tot * 100) : 0;
+    var cls = pct >= 80 ? 'bg-success' : pct >= 20 ? 'bg-warning' : 'bg-danger';
+    html += '<div class="row align-items-center mb-2">' +
+      '<div class="col-4 small">' + item.label + '</div>' +
+      '<div class="col-6"><div class="progress" style="height:16px">' +
+      '<div class="progress-bar ' + cls + '" style="width:' + pct + '%"></div></div></div>' +
+      '<div class="col-2 small text-end">' + item.n + '/' + tot + ' (' + pct + '%)</div>' +
+      '</div>';
+  });
+  document.getElementById('copertura-rows').innerHTML = html;
+})();
+</script>
 {% endblock %}
