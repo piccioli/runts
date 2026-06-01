@@ -1,9 +1,12 @@
 import argparse
 import logging
+import re
 import sys
+import unicodedata
+from difflib import SequenceMatcher
 
-from .cai_scraper import fetch_all_sections, fetch_subsections
-from .db import init_db, upsert_sezione_cai, upsert_sottosezione_cai
+from .cai_scraper import fetch_all_sections, fetch_regional_groups, fetch_subsections
+from .db import init_db, upsert_gruppo_regionale, upsert_sezione_cai, upsert_sottosezione_cai
 
 logging.basicConfig(
     level=logging.INFO,
@@ -34,7 +37,47 @@ def parse_args() -> argparse.Namespace:
         dest="no_subsections",
         help="Salta il fetch delle sottosezioni",
     )
+    parser.add_argument(
+        "--no-groups",
+        action="store_true",
+        dest="no_groups",
+        help="Salta il fetch dei gruppi regionali",
+    )
     return parser.parse_args()
+
+
+def _norm_name(s: str) -> str:
+    """Normalize a name for fuzzy comparison: lowercase, strip accents, remove punctuation."""
+    s = unicodedata.normalize("NFD", s.lower())
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    s = re.sub(r"[^a-z0-9\s]", " ", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _match_gr_to_enti(conn, gr: dict) -> str | None:
+    """Try to match a GR to an ente. Returns id_runts if found, else None."""
+    cf = gr.get("gr_codice_fiscale")
+    if cf:
+        row = conn.execute(
+            "SELECT id_runts FROM enti WHERE codice_fiscale = ?", (cf,)
+        ).fetchone()
+        if row:
+            return row["id_runts"]
+
+    gr_nome_norm = _norm_name(gr.get("gr_nome") or "")
+    if not gr_nome_norm:
+        return None
+
+    best_id = None
+    best_score = 0.0
+    for row in conn.execute("SELECT id_runts, denominazione FROM enti"):
+        ente_norm = _norm_name(row["denominazione"] or "")
+        score = SequenceMatcher(None, gr_nome_norm, ente_norm).ratio()
+        if score > best_score:
+            best_score = score
+            best_id = row["id_runts"]
+
+    return best_id if best_score >= 0.5 else None
 
 
 def main() -> None:
@@ -96,6 +139,32 @@ def main() -> None:
                     logger.warning("Errore salvataggio sottosezione '%s': %s", sub.get("cai_codice"), exc)
                     sottosezioni_fallite += 1
 
+    # --- Gruppi Regionali ---
+    gr_scaricati = gr_inseriti = gr_aggiornati = gr_agganciati = 0
+
+    if not args.no_groups:
+        logger.info("Fetching gruppi regionali CAI...")
+        try:
+            gruppi = fetch_regional_groups()
+        except Exception as exc:
+            logger.error("Errore fatale durante il fetch dei gruppi regionali: %s", exc)
+            gruppi = []
+
+        gr_scaricati = len(gruppi)
+        for gr in gruppi:
+            id_runts = _match_gr_to_enti(conn, gr)
+            if id_runts:
+                gr["gr_id_runts"] = id_runts
+                gr_agganciati += 1
+            try:
+                action = upsert_gruppo_regionale(conn, gr)
+                if action == "inserted":
+                    gr_inseriti += 1
+                else:
+                    gr_aggiornati += 1
+            except Exception as exc:
+                logger.warning("Errore salvataggio GR '%s': %s", gr.get("gr_codice"), exc)
+
     conn.close()
 
     print()
@@ -112,6 +181,12 @@ def main() -> None:
         print(f"  Sottosezioni inserite    : {sottosezioni_inserite}")
         print(f"  Sottosezioni aggiornate  : {sottosezioni_aggiornate}")
         print(f"  Sottosezioni fallite     : {sottosezioni_fallite}")
+    if not args.no_groups:
+        print()
+        print(f"  GR scaricati             : {gr_scaricati}")
+        print(f"  GR inseriti              : {gr_inseriti}")
+        print(f"  GR aggiornati            : {gr_aggiornati}")
+        print(f"  GR agganciati a RUNTS    : {gr_agganciati}")
     print("=" * 55)
 
 
