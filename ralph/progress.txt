@@ -1,0 +1,22 @@
+## Codebase Patterns
+- Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
+- FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
+- No mypy installed in the venv; typecheck = syntax OK + pytest passing
+- `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
+- SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
+- `base.html` includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — add BS5 JS bundle directly in templates that need it
+- The `active_page` context var is used in base.html for nav-link active states (set by each route in app.py)
+
+# Ralph Progress Log
+Started: Lun  1 Giu 2026
+---
+
+## 2026-06-01 - US-001
+- Added `sticky-top` class to `<nav class="navbar">` in `web/templates/base.html`
+- Header now stays visible during scroll on all pages
+- Files changed: `web/templates/base.html`
+- **Learnings for future iterations:**
+  - Bootstrap 5 `sticky-top` on the `<nav>` element is sufficient — no CSS override needed
+  - The container already has `pb-5` so content isn't hidden behind anything at the bottom
+  - Manual browser verification needed (no browser tools available in this env)
+---
