@@ -162,10 +162,16 @@ async def enti_list(
     })
 
 
+_VALID_TABS = {"principale", "bilanci", "allegati", "mappa"}
+
+
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
 async def ente_detail(request: Request, id_runts: str, back: Optional[str] = None):
     if not _db_exists():
         return _tr(request, "404.html", status_code=404)
+
+    tab = request.query_params.get("tab", "principale")
+    active_tab = tab if tab in _VALID_TABS else "principale"
 
     conn = get_db()
     try:
@@ -201,6 +207,7 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
         "allegati": allegati,
         "bilanci": bilanci,
         "cariche": cariche,
+        "active_tab": active_tab,
     })
 
 
