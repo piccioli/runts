@@ -196,7 +196,7 @@ async def enti_list(
     })
 
 
-_VALID_TABS = {"principale", "bilanci", "allegati", "mappa"}
+_VALID_TABS = {"principale", "bilanci", "allegati", "mappa", "sottosezioni"}
 
 
 @app.get("/ente/{id_runts}", response_class=HTMLResponse)
@@ -228,6 +228,18 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
             "ORDER BY (valid_to IS NULL) DESC, ruolo, cognome",
             (id_runts,),
         ).fetchall() if _table_exists(conn, "cariche_sociali") else []
+
+        sottosezioni = conn.execute(
+            "SELECT ss.cai_nome, json_extract(ss.cai_indirizzo_sede, '$.city') AS comune, "
+            "ss.cai_telefono_sede, ss.cai_telefono, ss.cai_email, ss.cai_soci, ss.cai_anno_fondazione "
+            "FROM enti e "
+            "JOIN sezioni_cai sc ON e.codice_fiscale = sc.cai_codice_fiscale "
+            "JOIN sottosezioni_cai ss ON sc.codice_cai = ss.cai_sezione_codice "
+            "WHERE e.id_runts = ? ORDER BY ss.cai_nome",
+            (id_runts,),
+        ).fetchall() if (
+            _table_exists(conn, "sezioni_cai") and _table_exists(conn, "sottosezioni_cai")
+        ) else []
     finally:
         conn.close()
 
@@ -241,6 +253,7 @@ async def ente_detail(request: Request, id_runts: str, back: Optional[str] = Non
         "allegati": allegati,
         "bilanci": bilanci,
         "cariche": cariche,
+        "sottosezioni": sottosezioni,
         "active_tab": active_tab,
     })
 
