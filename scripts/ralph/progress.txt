@@ -4,6 +4,8 @@
 - No mypy installed in the venv; typecheck = syntax OK + pytest passing
 - `_tr(request, template, context)` is the helper to render templates — always pass the context dict as the third argument
 - SQLite DB accessed read-only via `get_db()`; tables checked for existence with `_table_exists()` before querying
+- `base.html` includes Bootstrap 5 CSS but NOT Bootstrap 5 JS — add BS5 JS bundle directly in templates that need it (e.g. for `data-bs-toggle="tab"` and `shown.bs.tab`)
+- detail.html uses Bootstrap 5 nav-tabs with `data-bs-toggle="tab"` + Jinja2 `active_tab` for server-side initial state; JS adds `history.replaceState` and Leaflet lazy init via `shown.bs.tab`
 
 # Ralph Progress Log
 Started: Lun  1 Giu 2026 14:09:49 CEST
@@ -52,5 +54,43 @@ Started: Lun  1 Giu 2026 14:09:49 CEST
 - Files changed: `web/templates/detail.html`
 - **Learnings for future iterations:**
   - Empty-state messages must be inside the pane (not conditional on data) so the tab always shows something
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-005
+- Moved allegati table from standalone card outside tabs INTO the `tab-pane#allegati`
+- Added empty-state message `<p class="text-muted">Nessun documento disponibile.</p>` when no data
+- Removed standalone allegati card from outside the main card
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Same pattern as US-004 for bilanci
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-006
+- Added Leaflet map into `tab-pane#mappa` (height 450px, width 100%)
+- Lazy init via `shown.bs.tab` event — prevents Leaflet white tile bug on hidden elements
+- Also inits immediately if mappa tab is already active on page load (direct ?tab=mappa link)
+- Shows `<p class="text-muted">Coordinate non disponibili.</p>` when lat/lon absent
+- Removed standalone "Sede legale — mappa" card from outside the tabs
+- Added Bootstrap 5 JS bundle (needed for data-bs-toggle="tab" and shown.bs.tab event)
+- Changed nav-tabs from plain `<a href="?tab=...">` to `<a data-bs-toggle="tab" href="#slug">` for client-side tab switching
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - Bootstrap JS bundle must be loaded BEFORE the Leaflet script (tab events fire on BS JS init)
+  - Map div id changed from `map` to `ente-map` to avoid conflicts
+  - `_mapInit` guard prevents double initialization if event fires multiple times
+  - Manual browser verification needed
+---
+
+## 2026-06-01 - US-007
+- Added JS listener on `#enteTabs [data-bs-toggle="tab"]` for `shown.bs.tab` event
+- On each tab click, `history.replaceState` updates `?tab=<slug>` in the URL without reload
+- Slug derived from the href attribute of the clicked tab link (strip leading `#`)
+- Files changed: `web/templates/detail.html`
+- **Learnings for future iterations:**
+  - `e.target.getAttribute('href').replace('#', '')` extracts slug from the `<a>` data-bs-toggle link
+  - `new URL(window.location.href)` + `searchParams.set()` is clean way to update query params
+  - The `shown.bs.tab` listener for replaceState and for Leaflet lazy init both fire on the same event — order matters: replaceState JS is included before Leaflet JS, so they execute in document order
   - Manual browser verification needed
 ---

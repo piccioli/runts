@@ -79,7 +79,7 @@
         "Verify in browser: /ente/61826?tab=allegati mostra gli allegati di CAI Parma; aprire la scheda di un ente senza allegati e verificare il messaggio vuoto"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -97,7 +97,7 @@
         "Verify in browser: aprire /ente/83894?tab=mappa e verificare che il pin di CAI Pisa sia centrato correttamente senza tile bianchi"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -113,7 +113,7 @@
         "Verify in browser: cliccare su ciascuna delle 4 tab e verificare che l'URL cambi correttamente"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": ""
     }
   ]
