@@ -54,3 +54,31 @@ Started: Lun  1 Giu 2026
   - `PAGE_SIZE` is a single constant controlling all pagination math — one-line change
   - Manual browser verification needed (no browser tools available in this env)
 ---
+
+## 2026-06-01 - US-005
+- Added `issues: Optional[int] = None` parameter to `enti_list` route in `web/app.py`
+- When `issues=1`, appends a single OR-compound clause to the WHERE conditions covering: fuzzy_nome match note, cf_mismatch% match note, missing lat/lon, no bilanci record, no allegati record
+- Also added `issues: 0` to the early-return contexts (no DB, no table)
+- Added "Solo problemi dati" checkbox (name=issues value=1) next to the ETS checkbox in `web/templates/list.html`
+- Propagated `issues_param` into back_url set variable and all pagination `<a>` hrefs
+- Added "Filtro problemi attivo" badge in the results header when issues=1
+- Files changed: `web/app.py`, `web/templates/list.html`
+- **Learnings for future iterations:**
+  - The issues clause uses no bound parameters (all literals) — just append the string to `clauses`, no `params` extension needed
+  - `e.lat IS NULL OR e.lon IS NULL` will match all sezioni_cai with no LEFT JOIN match in enti (expected per PRD spec)
+  - Both `ets_param` and `issues_param` are needed as separate Jinja2 variables in the pagination block
+  - Manual browser verification needed (no browser tools available in this env)
+---
+
+## 2026-06-01 - US-006
+- Added route GET /ets in `web/app.py`: SELECT enti LEFT JOIN sezioni_cai ON codice_fiscale=cai_codice_fiscale, ordered non-agganciati first
+- Created `web/templates/ets.html` with table (Denominazione, Comune, Regione, Codice CAI, Status) and counter
+- Status badges: bg-success 'Agganciato' (exact match), bg-warning 'CF mancante CAI' (fuzzy_nome), bg-danger 'CF discordante' (cf_mismatch%), bg-warning text-dark 'Non agganciato' (NULL codice_cai)
+- Counter computed dynamically from query results (no hardcoded 226)
+- Files changed: `web/app.py`, `web/templates/ets.html`
+- **Learnings for future iterations:**
+  - `_table_exists()` guard needed for both `enti` and `sezioni_cai` before the JOIN query
+  - Jinja2 supports `.startswith()` on string values from sqlite3.Row — use `e.cai_match_note and e.cai_match_note.startswith('...')` to guard None
+  - Counter can be derived from `len()` and `sum()` over the already-fetched list rather than a separate COUNT query
+  - Manual browser verification needed (no browser tools available in this env)
+---

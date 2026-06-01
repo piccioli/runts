@@ -77,7 +77,7 @@
         "Verify in browser: attivare il filtro e verificare che compaiano solo sezioni con badge ⚠ o senza bilanci/allegati"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
@@ -93,7 +93,7 @@
         "Verify in browser: aprire /ets e verificare che i 31 enti non agganciati compaiano in cima con badge arancione"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": ""
     },
     {
