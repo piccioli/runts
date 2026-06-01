@@ -137,12 +137,13 @@ async def enti_list(
     regione: Optional[str] = None,
     sezione_registro: Optional[str] = None,
     ets: Optional[int] = None,
+    issues: Optional[int] = None,
     page: int = 1,
 ):
     if not _db_exists():
         return _tr(request, "list.html", {
             "enti": [], "total": 0, "page": 1, "total_pages": 0,
-            "q": "", "regione": "", "regioni": [], "ets": 0,
+            "q": "", "regione": "", "regioni": [], "ets": 0, "issues": 0,
             "active_page": "sezioni",
         })
 
@@ -151,13 +152,21 @@ async def enti_list(
         if not _table_exists(conn, "sezioni_cai"):
             return _tr(request, "list.html", {
                 "enti": [], "total": 0, "page": 1, "total_pages": 0,
-                "q": q or "", "regione": regione or "", "regioni": [], "ets": 0,
+                "q": q or "", "regione": regione or "", "regioni": [], "ets": 0, "issues": 0,
                 "active_page": "sezioni",
             })
 
         clauses, params = _build_cai_filter_clauses(q, regione)
         if ets:
             clauses.append("s.cai_codice_fiscale IS NOT NULL AND e.id_runts IS NOT NULL")
+        if issues:
+            clauses.append(
+                "(s.cai_match_note = 'fuzzy_nome'"
+                " OR s.cai_match_note LIKE 'cf_mismatch%'"
+                " OR e.lat IS NULL OR e.lon IS NULL"
+                " OR (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM bilanci b WHERE b.id_runts = e.id_runts))"
+                " OR (e.id_runts IS NOT NULL AND NOT EXISTS (SELECT 1 FROM allegati a WHERE a.id_runts = e.id_runts)))"
+            )
         where_sql = ("WHERE " + " AND ".join(clauses)) if clauses else ""
 
         total = conn.execute(
@@ -195,6 +204,7 @@ async def enti_list(
         "regione": regione or "",
         "regioni": regioni,
         "ets": 1 if ets else 0,
+        "issues": 1 if issues else 0,
         "active_page": "sezioni",
     })
 
