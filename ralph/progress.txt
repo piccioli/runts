@@ -191,6 +191,17 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-005 (ralph/devops branch)
+- Creato `.github/workflows/ci.yml` con due job paralleli: `lint-test` e `build`
+- `lint-test`: ubuntu-latest, python 3.12, installa tutti i requirements, crea symlink `.venv/bin/python3 → $(which python3)` per il pre-commit hook locale, esegue `pre-commit run --all-files` poi `pytest scraper/test_sede_legale.py scraper/test_upsert.py -v`
+- `build`: ubuntu-latest, `docker build -t runts:test .`, poi `docker run --rm runts:test python -c 'import uvicorn; print("ok")'`
+- Files changed: `.github/workflows/ci.yml` (new)
+- **Learnings for future iterations:**
+  - Il pre-commit hook locale (language: system) usa `.venv/bin/python3` — in CI va creato un symlink a `$(which python3)` prima di eseguire `pre-commit run --all-files`
+  - I due job non hanno dipendenze tra loro, girano in parallelo di default in GitHub Actions
+  - `actions/checkout@v4` e `actions/setup-python@v5` sono le versioni correnti stabili
+---
+
 ## Codebase Patterns
 - Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
 - FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
