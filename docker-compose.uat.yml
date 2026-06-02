@@ -1,13 +1,14 @@
 services:
   web:
-    build: .
+    image: ghcr.io/piccioli/runts:develop
     ports:
-      - "8000:8000"
+      - "127.0.0.1:9000:8000"
     volumes:
-      - ./runts.db:/app/runts.db:ro
-      - ./attachments:/app/attachments:ro
+      - /opt/runts/runts.db:/app/runts.db:ro
+      - /opt/runts/attachments:/app/attachments:ro
     environment:
       - DB_PATH=/app/runts.db
+      - ENV=uat
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

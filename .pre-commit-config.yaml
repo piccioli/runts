@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.15
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.1.0
+    hooks:
+      - id: mypy
+        args: [--ignore-missing-imports]
+        files: ^(scraper|web)/
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        language: system
+        entry: .venv/bin/python3 -m pytest scraper/test_sede_legale.py scraper/test_upsert.py -v --tb=short
+        pass_filenames: false
+        always_run: true

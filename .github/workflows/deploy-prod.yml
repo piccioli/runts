@@ -1,0 +1,24 @@
+name: Deploy PROD
+
+on:
+  workflow_run:
+    workflows:
+      - Publish
+    branches:
+      - prod
+    types:
+      - completed
+
+jobs:
+  deploy-prod:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Deploy to PROD via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f

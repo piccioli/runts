@@ -153,6 +153,105 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-003 (ralph/devops branch)
+- Creato `VERSION` nella root con contenuto `0.1.0`
+- Creato `CHANGELOG.md` con sezione iniziale `## [0.1.0] - 2026-06-02`
+- Creato `scripts/bump-version.sh` (chmod +x): accetta major|minor|patch, legge VERSION, incrementa, prepende in CHANGELOG.md, git commit + git tag
+- Testato con `bash scripts/bump-version.sh patch` → VERSION=0.1.1, tag v0.1.1; poi git reset --soft + restore a 0.1.0
+- Files changed: `VERSION` (new), `CHANGELOG.md` (new), `scripts/bump-version.sh` (new)
+- **Learnings for future iterations:**
+  - `git reset --soft HEAD~1` annulla il commit mantenendo i file modificati; poi `git restore --staged` per de-stagare
+  - Il script usa `printf "%s\n"` per scrivere il blocco CHANGELOG e poi `cat` per appendere il file esistente — funziona con `set -euo pipefail`
+  - `date +%Y-%m-%d` per la data corrente in formato ISO 8601
+---
+
+## 2026-06-02 - US-002 (ralph/devops branch)
+- Creato `.pre-commit-config.yaml` con 4 hook: ruff check --fix, ruff format, mypy (--ignore-missing-imports, files ^(scraper|web)/), pytest locale via .venv/bin/python3
+- Creato `requirements-dev.txt` con pre-commit>=4.0.0
+- Fix ruff errors: spostato `import re as _re` in geocoder.py, rinominato `http_client` → `_http_client` in main.py, aggiunto `from pathlib import Path` in scraper.py
+- Fix mypy errors: `results: list[dict] = []` in scraper.py, `return [], {}` invece di `return []`, type widening `dict[str, float | str | bool | None]` in analyzer.py, `PARMA_2025_EXPECTED: dict[str, float]` in test_analyzer.py, unpack `entities, _` in test_sede_legale.py, `# type: ignore` per pypdf stubs in pdf_utils.py
+- ruff format riformatta 13 file (line length); `pre-commit run --all-files` → 4/4 hook passano
+- Files changed: `.pre-commit-config.yaml` (new), `requirements-dev.txt` (new), scraper/{analyzer,geocoder,main,scraper,test_analyzer,test_sede_legale,test_upsert,cai_main,cai_scraper,db,downloader}.py, web/{app,pdf_utils}.py
+- **Learnings for future iterations:**
+  - `pre-commit install` in migration mode mantiene `.git/hooks/pre-commit.legacy` — comportamento normale
+  - Il hook mypy richiede `--ignore-missing-imports` perché playwright e altri package non hanno stubs completi
+  - L'hook locale pytest usa `always_run: true` e `pass_filenames: false` per eseguire sempre la suite completa
+  - `ruff format` è idempotente: dopo il primo run, le esecuzioni successive non modificano nulla
+---
+
+## 2026-06-02 - US-001 (ralph/devops branch)
+- Added route GET `/health` to `web/app.py`: checks `_db_exists()`, then runs `SELECT COUNT(*) FROM enti`, returns 200 `{status: ok, enti: N}` or 503 `{status: error, detail: ...}`
+- Added `JSONResponse` import from `fastapi.responses`
+- Added healthcheck to `docker-compose.yml`: `test: ["CMD", "curl", "-f", "http://localhost:8000/health"]`, interval: 30s, timeout: 5s, retries: 3
+- Files changed: `web/app.py`, `docker-compose.yml`
+- **Learnings for future iterations:**
+  - `JSONResponse` must be imported explicitly from `fastapi.responses` alongside `HTMLResponse`
+  - The health endpoint catches any DB exception (table missing, permissions, etc.) and returns 503 with the exception detail — no need to check table existence explicitly
+  - The endpoint is placed before the `# ---------- API endpoints ----------` section for logical grouping
+  - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-02 - US-007 (ralph/devops branch)
+- Creato `.github/workflows/deploy-uat.yml` che si attiva su `workflow_run` del workflow `Publish` completato con successo sul branch `develop`
+- Job `deploy-uat` con `if: ${{ github.event.workflow_run.conclusion == 'success' }}` — il job viene saltato (non fallisce) se il workflow upstream fallisce, ma il deploy stesso fallisce se SSH fallisce
+- Usa `appleboy/ssh-action@v1` con host/username/key da secrets
+- Comando remoto: `cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f`
+- Files changed: `.github/workflows/deploy-uat.yml` (new)
+- **Learnings for future iterations:**
+  - Il `workflow_run` trigger richiede il nome esatto del workflow upstream (`name:` nel file, non il filename) — qui "Publish"
+  - `appleboy/ssh-action@v1` fallisce con exit code non zero se il comando remoto fallisce — nessuna configurazione aggiuntiva necessaria
+  - Il `if: conclusion == 'success'` è necessario per evitare deploy su publish falliti
+---
+
+## 2026-06-02 - US-006 (ralph/devops branch)
+- Creato `.github/workflows/publish.yml` che si attiva su push ai branch `develop` e `prod`
+- Permissions: `contents: read`, `packages: write`
+- Login su `ghcr.io` con `docker/login-action@v3` usando `GITHUB_TOKEN`
+- Legge VERSION con uno step dedicato (`id: version`) e calcola i tag con uno step condizionale (`id: tags`)
+- Tag `develop`: `ghcr.io/piccioli/runts:develop`; tag `prod`: `ghcr.io/piccioli/runts:latest,ghcr.io/piccioli/runts:vX.Y.Z`
+- Build e push con `docker/build-push-action@v5` con cache GHA (cache-from/cache-to type=gha)
+- Files changed: `.github/workflows/publish.yml` (new)
+- **Learnings for future iterations:**
+  - Due step separati (`version` e `tags`) rendono il workflow leggibile; i `GITHUB_OUTPUT` si leggono via `${{ steps.<id>.outputs.<key> }}`
+  - `docker/build-push-action@v5` accetta più tag separati da virgola nella chiave `tags`
+  - `github.ref_name` restituisce il nome del branch (es. `prod`) senza il prefisso `refs/heads/`
+---
+
+## 2026-06-02 - US-005 (ralph/devops branch)
+- Creato `.github/workflows/ci.yml` con due job paralleli: `lint-test` e `build`
+- `lint-test`: ubuntu-latest, python 3.12, installa tutti i requirements, crea symlink `.venv/bin/python3 → $(which python3)` per il pre-commit hook locale, esegue `pre-commit run --all-files` poi `pytest scraper/test_sede_legale.py scraper/test_upsert.py -v`
+- `build`: ubuntu-latest, `docker build -t runts:test .`, poi `docker run --rm runts:test python -c 'import uvicorn; print("ok")'`
+- Files changed: `.github/workflows/ci.yml` (new)
+- **Learnings for future iterations:**
+  - Il pre-commit hook locale (language: system) usa `.venv/bin/python3` — in CI va creato un symlink a `$(which python3)` prima di eseguire `pre-commit run --all-files`
+  - I due job non hanno dipendenze tra loro, girano in parallelo di default in GitHub Actions
+  - `actions/checkout@v4` e `actions/setup-python@v5` sono le versioni correnti stabili
+---
+
+## 2026-06-02 - US-009 (ralph/devops branch)
+- `docker-compose.yml` rimasto invariato (build locale con `build: .`)
+- Creato `docker-compose.uat.yml`: image `ghcr.io/piccioli/runts:develop`, volume `/opt/runts/runts.db` + `/opt/runts/attachments`, `ENV=uat`, restart `unless-stopped`
+- Creato `docker-compose.prod.yml`: image `ghcr.io/piccioli/runts:latest`, stessi volumi, `ENV=prod`, restart `always`
+- SCP entrambi i file sui server remoti (UAT: 135.181.25.33, PROD: 178.105.78.67) — exit code 0
+- Aggiornato `README.md` con sezione Docker: locale (`docker compose up`) e UAT/PROD (`docker compose -f docker-compose.uat.yml up -d`)
+- Files changed: `docker-compose.uat.yml` (new), `docker-compose.prod.yml` (new), `README.md`
+- **Learnings for future iterations:**
+  - La differenza tra UAT e PROD è solo: image tag (`develop` vs `latest`), `ENV` var, e `restart` policy (`unless-stopped` vs `always`)
+  - healthcheck è presente in entrambi i file environment-specific (stessa configurazione del locale)
+  - SCP funziona con le chiavi SSH già configurate sul sistema locale — nessuna configurazione aggiuntiva necessaria
+---
+
+## 2026-06-02 - US-008 (ralph/devops branch)
+- Creato `.github/workflows/deploy-prod.yml` che si attiva su `workflow_run` del workflow `Publish` completato con successo sul branch `prod`
+- Job `deploy-prod` con `if: ${{ github.event.workflow_run.conclusion == 'success' }}`
+- Usa `appleboy/ssh-action@v1` con host/username/key da secrets (`PROD_SSH_HOST`, `PROD_SSH_USER`, `PROD_SSH_KEY`)
+- Comando remoto: `cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f`
+- Files changed: `.github/workflows/deploy-prod.yml` (new)
+- **Learnings for future iterations:**
+  - Il file è identico a `deploy-uat.yml` tranne per: branch `prod` invece di `develop`, secrets `PROD_*` invece di `UAT_*`, job name `deploy-prod`
+  - Pattern consolidato: workflow_run + appleboy/ssh-action@v1 + docker compose pull/up/prune
+---
+
 ## Codebase Patterns
 - Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
 - FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
@@ -247,4 +346,16 @@ Started: Lun  1 Giu 2026
   - `COALESCE(SUM(...), 0)` needed for soci_totali when table is empty
   - Jinja2 number formatting: `"{:,}".format(n).replace(",", ".")` for Italian thousands separator
   - Manual browser verification needed (no browser tools)
+---
+
+## 2026-06-02 - US-004 (ralph/devops branch)
+- Creato `.devcontainer/devcontainer.json`: name=RUNTS-CAI, build.dockerfile=Dockerfile, postCreateCommand installa requirements + pre-commit + playwright chromium
+- Creato `.devcontainer/Dockerfile`: basato su python:3.12 (non slim), apt-get installa curl, git, e 20 dipendenze di sistema per Playwright Chromium
+- Creato `README.md` con sezioni Setup (locale, dev container, Docker) e Versioning; include nota 'Dev container disponibile — aprire in VS Code e selezionare Reopen in Container'
+- Files changed: `.devcontainer/Dockerfile` (new), `.devcontainer/devcontainer.json` (new), `README.md` (new)
+- **Learnings for future iterations:**
+  - Usare `python:3.12` (non slim) come base nel devcontainer Dockerfile — evita di dover installare manualmente troppe dipendenze di build
+  - Le dipendenze di sistema per Playwright Chromium includono libglib2.0-0, libnss3, libnspr4, libatk1.0-0, libxcb1, libgbm1, libasound2 (e altre ~15)
+  - Il `postCreateCommand` in devcontainer.json installa tutti i requirements Python + pre-commit hooks + playwright browser in un unico comando
+  - README.md creato da zero (non esisteva nel repo)
 ---

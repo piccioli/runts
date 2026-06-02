@@ -7,7 +7,6 @@ from pathlib import Path
 import httpx
 
 from .db import get_stats, init_db, upsert_allegato, upsert_ente, sync_cariche
-from .downloader import download_attachments
 from .scraper import run_scraper
 
 logging.basicConfig(
@@ -42,7 +41,8 @@ def parse_args() -> argparse.Namespace:
         help="Millisecondi di attesa tra una pagina dettaglio e la successiva (default: 500)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Abilita log di debug",
     )
@@ -86,7 +86,9 @@ async def main() -> None:
 
     # 2. Scrape
     att_dir = Path(args.attachments_dir)
-    logger.info("Avvio scraping (headless=%s, delay=%dms)...", args.headless, args.delay)
+    logger.info(
+        "Avvio scraping (headless=%s, delay=%dms)...", args.headless, args.delay
+    )
     try:
         entities, retry_stats = await run_scraper(
             denominazione=args.denominazione,
@@ -105,10 +107,12 @@ async def main() -> None:
     att_scoperti = att_scaricati = att_cache = att_saltati = att_falliti = 0
 
     async with httpx.AsyncClient(
-        headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"},
+        headers={
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        },
         limits=httpx.Limits(max_connections=4),
         timeout=httpx.Timeout(60.0),
-    ) as http_client:
+    ) as _http_client:
         for entity in entities:
             atti = entity.pop("atti_documenti", []) or []
             cariche = entity.pop("cariche", []) or []
@@ -120,7 +124,9 @@ async def main() -> None:
                 else:
                     updated += 1
             except Exception as exc:
-                logger.warning("Errore salvataggio ente '%s': %s", entity.get("denominazione"), exc)
+                logger.warning(
+                    "Errore salvataggio ente '%s': %s", entity.get("denominazione"), exc
+                )
                 errors += 1
                 continue
 
@@ -142,7 +148,9 @@ async def main() -> None:
                         else:
                             att_scaricati += 1
                     except Exception as exc:
-                        logger.warning("Errore upsert allegato per %s: %s", id_runts, exc)
+                        logger.warning(
+                            "Errore upsert allegato per %s: %s", id_runts, exc
+                        )
                         att_falliti += 1
 
             # Cariche sociali
@@ -164,7 +172,9 @@ async def main() -> None:
     print(f"  Inseriti                 : {inserted}")
     print(f"  Aggiornati               : {updated}")
     print(f"  Errori salvataggio       : {errors}")
-    print(f"  Totale nel DB            : {stats_after['total']}  (prima: {stats_before['total']})")
+    print(
+        f"  Totale nel DB            : {stats_after['total']}  (prima: {stats_before['total']})"
+    )
     print()
     print(f"  Recuperati al 1° tentativo: {retry_stats['attempt_1']}")
     print(f"  Recuperati al 2° tentativo: {retry_stats['attempt_2']}")

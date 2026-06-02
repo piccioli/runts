@@ -1,6 +1,7 @@
 import argparse
 import json
 import logging
+import re as _re
 import sqlite3
 import time
 import urllib.parse
@@ -15,12 +16,9 @@ _USER_AGENT = "runts-cai-geocoder/1.0 (https://github.com/piccioli/runts)"
 _WEB_BASE = "http://localhost:8000"
 
 
-import re as _re
-
-
 def _strip_abbreviations(via: str) -> str:
     """Rimuove iniziali puntate tipo 'G.M.' lasciando solo le parole intere."""
-    return _re.sub(r'\b([A-Z]\.)+', '', via).strip()
+    return _re.sub(r"\b([A-Z]\.)+", "", via).strip()
 
 
 def _build_queries(
@@ -40,7 +38,9 @@ def _build_queries(
 
         # 1. indirizzo completo + civico + CAP + comune
         if civico:
-            queries.append(", ".join([f"{via} {civico}"] + cap_part + [comune_t, "Italia"]))
+            queries.append(
+                ", ".join([f"{via} {civico}"] + cap_part + [comune_t, "Italia"])
+            )
         # 2. indirizzo + CAP + comune (senza civico)
         queries.append(", ".join([via] + cap_part + [comune_t, "Italia"]))
         # 3. indirizzo senza abbreviazioni + CAP + comune
@@ -90,7 +90,9 @@ def _lookup_cache(conn: sqlite3.Connection, key: str) -> tuple[float, float] | N
     return None
 
 
-def _write_cache(conn: sqlite3.Connection, key: str, lat: float, lon: float, source: str) -> None:
+def _write_cache(
+    conn: sqlite3.Connection, key: str, lat: float, lon: float, source: str
+) -> None:
     ts = datetime.now(timezone.utc).isoformat()
     conn.execute(
         "INSERT OR REPLACE INTO geocoding_cache (cache_key, lat, lon, source, ts) VALUES (?, ?, ?, ?, ?)",
@@ -112,7 +114,9 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
     geocoded = skipped = not_found = errors = from_cache = from_nominatim = 0
 
     with error_log_path.open("w", encoding="utf-8") as err_file:
-        err_file.write(f"# Geocoder error log\n# Totale enti da processare: {total}\n\n")
+        err_file.write(
+            f"# Geocoder error log\n# Totale enti da processare: {total}\n\n"
+        )
 
         for i, row in enumerate(rows, 1):
             id_runts = row["id_runts"]
@@ -156,7 +160,9 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
 
             for attempt, query in enumerate(queries):
                 if attempt > 0:
-                    logger.info("  Fallback [%d/%d]: %s", attempt + 1, len(queries), query)
+                    logger.info(
+                        "  Fallback [%d/%d]: %s", attempt + 1, len(queries), query
+                    )
                     time.sleep(1)
                 try:
                     coords = _nominatim_fetch(query)
@@ -177,22 +183,24 @@ def geocode_enti(conn: sqlite3.Connection, error_log_path: Path) -> dict:
                 conn.commit()
                 _write_cache(conn, key, lat, lon, "nominatim")
                 if winning_query != queries[0]:
-                    logger.info("  → %.6f, %.6f ✓  (via fallback: %s)", lat, lon, winning_query)
+                    logger.info(
+                        "  → %.6f, %.6f ✓  (via fallback: %s)", lat, lon, winning_query
+                    )
                 else:
                     logger.info("  → %.6f, %.6f ✓", lat, lon)
                 geocoded += 1
                 from_nominatim += 1
             elif last_exc:
-                msg = (f"{prefix} — ERRORE HTTP: {last_exc}\n"
-                       f"  Query tentate: {queries}")
+                msg = f"{prefix} — ERRORE HTTP: {last_exc}\n  Query tentate: {queries}"
                 logger.error("  → %s", last_exc)
                 err_file.write(f"ERRORE  {msg}\n  → {_WEB_BASE}/ente/{id_runts}\n\n")
                 errors += 1
             else:
-                msg = (f"{prefix} — NON TROVATO\n"
-                       f"  Query tentate: {queries}")
+                msg = f"{prefix} — NON TROVATO\n  Query tentate: {queries}"
                 logger.warning("  → nessun risultato dopo %d tentativi", len(queries))
-                err_file.write(f"NON TROVATO  {msg}\n  → {_WEB_BASE}/ente/{id_runts}\n\n")
+                err_file.write(
+                    f"NON TROVATO  {msg}\n  → {_WEB_BASE}/ente/{id_runts}\n\n"
+                )
                 not_found += 1
                 errors += 1
 
@@ -213,10 +221,17 @@ if __name__ == "__main__":
     )
     parser.add_argument("--db", default="runts.db", metavar="PATH")
     parser.add_argument("--verbose", "-v", action="store_true")
-    parser.add_argument("--reset", action="store_true",
-                        help="Azzera lat/lon esistenti e ri-geocodifica tutto")
-    parser.add_argument("--log-dir", default="scraper/logs", metavar="DIR",
-                        help="Directory dove salvare i file di log (default: scraper/logs)")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Azzera lat/lon esistenti e ri-geocodifica tutto",
+    )
+    parser.add_argument(
+        "--log-dir",
+        default="scraper/logs",
+        metavar="DIR",
+        help="Directory dove salvare i file di log (default: scraper/logs)",
+    )
     args = parser.parse_args()
 
     log_dir = Path(args.log_dir)
@@ -248,8 +263,12 @@ if __name__ == "__main__":
         "SELECT COUNT(*) FROM enti WHERE lat IS NOT NULL AND lon IS NOT NULL"
     ).fetchone()[0]
     total_db = conn.execute("SELECT COUNT(*) FROM enti").fetchone()[0]
-    logger.info("DB: %d enti totali, %d già geocodificati, %d da processare",
-                total_db, already, total_db - already)
+    logger.info(
+        "DB: %d enti totali, %d già geocodificati, %d da processare",
+        total_db,
+        already,
+        total_db - already,
+    )
     logger.info("Log principale : %s", main_log.resolve())
     logger.info("Log errori     : %s", error_log.resolve())
 
