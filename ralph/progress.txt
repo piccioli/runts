@@ -191,6 +191,18 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-007 (ralph/devops branch)
+- Creato `.github/workflows/deploy-uat.yml` che si attiva su `workflow_run` del workflow `Publish` completato con successo sul branch `develop`
+- Job `deploy-uat` con `if: ${{ github.event.workflow_run.conclusion == 'success' }}` — il job viene saltato (non fallisce) se il workflow upstream fallisce, ma il deploy stesso fallisce se SSH fallisce
+- Usa `appleboy/ssh-action@v1` con host/username/key da secrets
+- Comando remoto: `cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f`
+- Files changed: `.github/workflows/deploy-uat.yml` (new)
+- **Learnings for future iterations:**
+  - Il `workflow_run` trigger richiede il nome esatto del workflow upstream (`name:` nel file, non il filename) — qui "Publish"
+  - `appleboy/ssh-action@v1` fallisce con exit code non zero se il comando remoto fallisce — nessuna configurazione aggiuntiva necessaria
+  - Il `if: conclusion == 'success'` è necessario per evitare deploy su publish falliti
+---
+
 ## 2026-06-02 - US-006 (ralph/devops branch)
 - Creato `.github/workflows/publish.yml` che si attiva su push ai branch `develop` e `prod`
 - Permissions: `contents: read`, `packages: write`
