@@ -228,6 +228,19 @@
   - `actions/checkout@v4` e `actions/setup-python@v5` sono le versioni correnti stabili
 ---
 
+## 2026-06-02 - US-009 (ralph/devops branch)
+- `docker-compose.yml` rimasto invariato (build locale con `build: .`)
+- Creato `docker-compose.uat.yml`: image `ghcr.io/piccioli/runts:develop`, volume `/opt/runts/runts.db` + `/opt/runts/attachments`, `ENV=uat`, restart `unless-stopped`
+- Creato `docker-compose.prod.yml`: image `ghcr.io/piccioli/runts:latest`, stessi volumi, `ENV=prod`, restart `always`
+- SCP entrambi i file sui server remoti (UAT: 135.181.25.33, PROD: 178.105.78.67) — exit code 0
+- Aggiornato `README.md` con sezione Docker: locale (`docker compose up`) e UAT/PROD (`docker compose -f docker-compose.uat.yml up -d`)
+- Files changed: `docker-compose.uat.yml` (new), `docker-compose.prod.yml` (new), `README.md`
+- **Learnings for future iterations:**
+  - La differenza tra UAT e PROD è solo: image tag (`develop` vs `latest`), `ENV` var, e `restart` policy (`unless-stopped` vs `always`)
+  - healthcheck è presente in entrambi i file environment-specific (stessa configurazione del locale)
+  - SCP funziona con le chiavi SSH già configurate sul sistema locale — nessuna configurazione aggiuntiva necessaria
+---
+
 ## 2026-06-02 - US-008 (ralph/devops branch)
 - Creato `.github/workflows/deploy-prod.yml` che si attiva su `workflow_run` del workflow `Publish` completato con successo sul branch `prod`
 - Job `deploy-prod` con `if: ${{ github.event.workflow_run.conclusion == 'success' }}`
