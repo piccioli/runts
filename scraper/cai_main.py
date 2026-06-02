@@ -6,7 +6,12 @@ import unicodedata
 from difflib import SequenceMatcher
 
 from .cai_scraper import fetch_all_sections, fetch_regional_groups, fetch_subsections
-from .db import init_db, upsert_gruppo_regionale, upsert_sezione_cai, upsert_sottosezione_cai
+from .db import (
+    init_db,
+    upsert_gruppo_regionale,
+    upsert_sezione_cai,
+    upsert_sottosezione_cai,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,7 +32,8 @@ def parse_args() -> argparse.Namespace:
         help="Percorso del database SQLite (default: runts.db)",
     )
     parser.add_argument(
-        "--verbose", "-v",
+        "--verbose",
+        "-v",
         action="store_true",
         help="Abilita log di debug",
     )
@@ -109,11 +115,15 @@ def main() -> None:
             else:
                 sezioni_aggiornate += 1
         except Exception as exc:
-            logger.warning("Errore salvataggio sezione '%s': %s", sec.get("codice_cai"), exc)
+            logger.warning(
+                "Errore salvataggio sezione '%s': %s", sec.get("codice_cai"), exc
+            )
             sezioni_fallite += 1
 
     # --- Sottosezioni ---
-    sottosezioni_scaricate = sottosezioni_inserite = sottosezioni_aggiornate = sottosezioni_fallite = 0
+    sottosezioni_scaricate = sottosezioni_inserite = sottosezioni_aggiornate = (
+        sottosezioni_fallite
+    ) = 0
 
     if not args.no_subsections:
         logger.info("Fetching sottosezioni per %d sezioni...", sezioni_scaricate)
@@ -136,7 +146,11 @@ def main() -> None:
                     else:
                         sottosezioni_aggiornate += 1
                 except Exception as exc:
-                    logger.warning("Errore salvataggio sottosezione '%s': %s", sub.get("cai_codice"), exc)
+                    logger.warning(
+                        "Errore salvataggio sottosezione '%s': %s",
+                        sub.get("cai_codice"),
+                        exc,
+                    )
                     sottosezioni_fallite += 1
 
     # --- Gruppi Regionali ---
@@ -163,7 +177,9 @@ def main() -> None:
                 else:
                     gr_aggiornati += 1
             except Exception as exc:
-                logger.warning("Errore salvataggio GR '%s': %s", gr.get("gr_codice"), exc)
+                logger.warning(
+                    "Errore salvataggio GR '%s': %s", gr.get("gr_codice"), exc
+                )
 
     conn.close()
 
