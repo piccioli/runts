@@ -19,8 +19,15 @@ Dev container disponibile — aprire in VS Code e selezionare Reopen in Containe
 
 ### Docker
 
+**Locale:**
 ```bash
 docker compose up
+```
+
+**UAT/PROD (sui server remoti):**
+```bash
+docker compose -f docker-compose.uat.yml up -d   # UAT
+docker compose -f docker-compose.prod.yml up -d  # PROD
 ```
 
 ## Versioning
