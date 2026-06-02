@@ -153,6 +153,20 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-002 (ralph/devops branch)
+- Creato `.pre-commit-config.yaml` con 4 hook: ruff check --fix, ruff format, mypy (--ignore-missing-imports, files ^(scraper|web)/), pytest locale via .venv/bin/python3
+- Creato `requirements-dev.txt` con pre-commit>=4.0.0
+- Fix ruff errors: spostato `import re as _re` in geocoder.py, rinominato `http_client` → `_http_client` in main.py, aggiunto `from pathlib import Path` in scraper.py
+- Fix mypy errors: `results: list[dict] = []` in scraper.py, `return [], {}` invece di `return []`, type widening `dict[str, float | str | bool | None]` in analyzer.py, `PARMA_2025_EXPECTED: dict[str, float]` in test_analyzer.py, unpack `entities, _` in test_sede_legale.py, `# type: ignore` per pypdf stubs in pdf_utils.py
+- ruff format riformatta 13 file (line length); `pre-commit run --all-files` → 4/4 hook passano
+- Files changed: `.pre-commit-config.yaml` (new), `requirements-dev.txt` (new), scraper/{analyzer,geocoder,main,scraper,test_analyzer,test_sede_legale,test_upsert,cai_main,cai_scraper,db,downloader}.py, web/{app,pdf_utils}.py
+- **Learnings for future iterations:**
+  - `pre-commit install` in migration mode mantiene `.git/hooks/pre-commit.legacy` — comportamento normale
+  - Il hook mypy richiede `--ignore-missing-imports` perché playwright e altri package non hanno stubs completi
+  - L'hook locale pytest usa `always_run: true` e `pass_filenames: false` per eseguire sempre la suite completa
+  - `ruff format` è idempotente: dopo il primo run, le esecuzioni successive non modificano nulla
+---
+
 ## 2026-06-02 - US-001 (ralph/devops branch)
 - Added route GET `/health` to `web/app.py`: checks `_db_exists()`, then runs `SELECT COUNT(*) FROM enti`, returns 200 `{status: ok, enti: N}` or 503 `{status: error, detail: ...}`
 - Added `JSONResponse` import from `fastapi.responses`
