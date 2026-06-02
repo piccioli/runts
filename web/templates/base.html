@@ -45,6 +45,7 @@
   <footer class="footer fixed-bottom bg-dark text-white py-2">
     <div class="container text-center small">
       Montagna Servizi S.C.P.A. &mdash; Via Errico Petrella 19, 20124 Milano &mdash; montagnaservizi.com
+      {% if app_version %}<span class="text-white-50 ms-3">v{{ app_version }}</span>{% endif %}
     </div>
   </footer>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

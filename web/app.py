@@ -13,6 +13,21 @@ from fastapi.templating import Jinja2Templates
 DB_PATH = os.environ.get("DB_PATH", "/app/runts.db")
 PAGE_SIZE = 50
 
+
+def _read_version() -> str:
+    for candidate in (
+        "VERSION",
+        os.path.join(os.path.dirname(__file__), "..", "VERSION"),
+    ):
+        try:
+            return open(candidate).read().strip()
+        except OSError:
+            pass
+    return ""
+
+
+APP_VERSION = _read_version()
+
 app = FastAPI()
 app.mount(
     "/static",
@@ -84,7 +99,10 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
 
 def _tr(request: Request, name: str, context: dict = {}, **kwargs):
     return templates.TemplateResponse(
-        request=request, name=name, context=context, **kwargs
+        request=request,
+        name=name,
+        context={"app_version": APP_VERSION, **context},
+        **kwargs,
     )
 
 
