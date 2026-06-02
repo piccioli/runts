@@ -191,6 +191,20 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-006 (ralph/devops branch)
+- Creato `.github/workflows/publish.yml` che si attiva su push ai branch `develop` e `prod`
+- Permissions: `contents: read`, `packages: write`
+- Login su `ghcr.io` con `docker/login-action@v3` usando `GITHUB_TOKEN`
+- Legge VERSION con uno step dedicato (`id: version`) e calcola i tag con uno step condizionale (`id: tags`)
+- Tag `develop`: `ghcr.io/piccioli/runts:develop`; tag `prod`: `ghcr.io/piccioli/runts:latest,ghcr.io/piccioli/runts:vX.Y.Z`
+- Build e push con `docker/build-push-action@v5` con cache GHA (cache-from/cache-to type=gha)
+- Files changed: `.github/workflows/publish.yml` (new)
+- **Learnings for future iterations:**
+  - Due step separati (`version` e `tags`) rendono il workflow leggibile; i `GITHUB_OUTPUT` si leggono via `${{ steps.<id>.outputs.<key> }}`
+  - `docker/build-push-action@v5` accetta più tag separati da virgola nella chiave `tags`
+  - `github.ref_name` restituisce il nome del branch (es. `prod`) senza il prefisso `refs/heads/`
+---
+
 ## 2026-06-02 - US-005 (ralph/devops branch)
 - Creato `.github/workflows/ci.yml` con due job paralleli: `lint-test` e `build`
 - `lint-test`: ubuntu-latest, python 3.12, installa tutti i requirements, crea symlink `.venv/bin/python3 → $(which python3)` per il pre-commit hook locale, esegue `pre-commit run --all-files` poi `pytest scraper/test_sede_legale.py scraper/test_upsert.py -v`
