@@ -1,9 +1,9 @@
 """Offline analyzer for ETS financial statements (rendiconto gestionale DM 39/2020)."""
+
 import argparse
 import logging
 import re
 import sqlite3
-import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -91,13 +91,17 @@ _PATTERNS: dict[str, list[str]] = {
 }
 
 _ONERI_SUBTOTALS = [
-    "oneri_a_interesse_generale", "oneri_b_attivita_diverse",
-    "oneri_c_raccolta_fondi", "oneri_d_finanziarie_patrimoniali",
+    "oneri_a_interesse_generale",
+    "oneri_b_attivita_diverse",
+    "oneri_c_raccolta_fondi",
+    "oneri_d_finanziarie_patrimoniali",
     "oneri_e_supporto_generale",
 ]
 _PROVENTI_SUBTOTALS = [
-    "proventi_a_interesse_generale", "proventi_b_attivita_diverse",
-    "proventi_c_raccolta_fondi", "proventi_d_finanziarie_patrimoniali",
+    "proventi_a_interesse_generale",
+    "proventi_b_attivita_diverse",
+    "proventi_c_raccolta_fondi",
+    "proventi_d_finanziarie_patrimoniali",
     "proventi_e_supporto_generale",
 ]
 
@@ -132,7 +136,6 @@ def _ocr_pdf(path: str) -> str:
     Uses subprocess + temp files in the project dir to avoid sandbox /tmp restrictions.
     """
     import subprocess
-    import tempfile
 
     try:
         from pdf2image import convert_from_path
@@ -159,16 +162,25 @@ def _ocr_pdf(path: str) -> str:
             img.save(str(img_path))
             result = subprocess.run(
                 ["tesseract", str(img_path), out_base, "-l", "ita", "--psm", "6"],
-                capture_output=True, timeout=120,
+                capture_output=True,
+                timeout=120,
             )
             if result.returncode == 0:
                 out_file = Path(out_base + ".txt")
-                txt = out_file.read_text(encoding="utf-8", errors="replace") if out_file.exists() else ""
+                txt = (
+                    out_file.read_text(encoding="utf-8", errors="replace")
+                    if out_file.exists()
+                    else ""
+                )
                 pages_text.append(txt)
                 logger.debug("OCR pag %d: %d chars", i + 1, len(txt))
             else:
-                logger.warning("OCR errore pag %d di %s: %s", i + 1, path,
-                               result.stderr.decode("utf-8", "replace")[:100])
+                logger.warning(
+                    "OCR errore pag %d di %s: %s",
+                    i + 1,
+                    path,
+                    result.stderr.decode("utf-8", "replace")[:100],
+                )
         except Exception as exc:
             logger.warning("OCR errore pag %d di %s: %s", i + 1, path, exc)
         finally:
@@ -190,7 +202,7 @@ def extract_bilancio_pdf(path: str, ocr_fallback: bool = True) -> dict:
     """
     import pdfplumber
 
-    result: dict[str, float | None] = {k: None for k in _PATTERNS}
+    result: dict[str, float | str | bool | None] = {k: None for k in _PATTERNS}
     raw_text = ""
     used_ocr = False
 
@@ -236,7 +248,10 @@ def _check_coherence(result: dict, subtotals: list[str], total_key: str) -> None
     if abs(computed - declared) > 0.01:
         logger.warning(
             "Incoerenza %s: somma A-E = %.2f, totale = %.2f (diff %.2f)",
-            total_key, computed, declared, abs(computed - declared),
+            total_key,
+            computed,
+            declared,
+            abs(computed - declared),
         )
 
 
@@ -245,8 +260,14 @@ def main() -> None:
         description="Analizza i bilanci ETS scaricati e ne estrae i totali finanziari."
     )
     parser.add_argument("--db", default="runts.db", metavar="PATH")
-    parser.add_argument("--id-runts", metavar="ID", help="Analizza solo l'ente specificato")
-    parser.add_argument("--force", action="store_true", help="Ri-analizza anche i bilanci già analizzati")
+    parser.add_argument(
+        "--id-runts", metavar="ID", help="Analizza solo l'ente specificato"
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Ri-analizza anche i bilanci già analizzati",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -259,7 +280,11 @@ def main() -> None:
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
 
-    where_clauses = ["a.tipo = 'bilancio_esercizio'", "a.path IS NOT NULL", "a.anno IS NOT NULL"]
+    where_clauses = [
+        "a.tipo = 'bilancio_esercizio'",
+        "a.path IS NOT NULL",
+        "a.anno IS NOT NULL",
+    ]
     params: list = []
 
     if args.id_runts:
@@ -310,16 +335,32 @@ def main() -> None:
         try:
             upsert_bilancio(conn, data)
         except Exception as exc:
-            logger.error("Errore upsert bilancio %s anno %s: %s", row["id_runts"], row["anno"], exc)
+            logger.error(
+                "Errore upsert bilancio %s anno %s: %s",
+                row["id_runts"],
+                row["anno"],
+                exc,
+            )
             failed += 1
             continue
 
         ocr_tag = " [OCR]" if used_ocr else ""
         if numeric_fields:
-            logger.info("✓ %s anno %s — %d campi estratti%s", row["id_runts"], row["anno"], len(numeric_fields), ocr_tag)
+            logger.info(
+                "✓ %s anno %s — %d campi estratti%s",
+                row["id_runts"],
+                row["anno"],
+                len(numeric_fields),
+                ocr_tag,
+            )
             success += 1
         else:
-            logger.info("~ %s anno %s — solo raw_text (nessun campo numerico)%s", row["id_runts"], row["anno"], ocr_tag)
+            logger.info(
+                "~ %s anno %s — solo raw_text (nessun campo numerico)%s",
+                row["id_runts"],
+                row["anno"],
+                ocr_tag,
+            )
             partial += 1
 
     conn.close()

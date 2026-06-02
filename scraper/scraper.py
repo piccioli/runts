@@ -1,7 +1,7 @@
 import asyncio
-import json
 import logging
 import re
+from pathlib import Path
 
 from playwright.async_api import Page, async_playwright
 
@@ -12,66 +12,145 @@ DETAIL_URL_PATTERN = "**/Ricerca-enti/Ente*"
 
 # IDs present on the detail page (sede fields handled by _EXTRACT_SEDE_LEGALE_JS)
 _DETAIL_IDS = {
-    "id_runts":       "spnRepertorio",
+    "id_runts": "spnRepertorio",
     "codice_fiscale": "spnCodiceFiscale",
-    "pec":            "spnEmailPec",
-    "sito_web":       "spnSitoInternet",
+    "pec": "spnEmailPec",
+    "sito_web": "spnSitoInternet",
 }
 
 _PROVINCIA_TO_REGIONE: dict[str, str] = {
     # Valle d'Aosta
     "AO": "Valle d'Aosta",
     # Piemonte
-    "AL": "Piemonte", "AT": "Piemonte", "BI": "Piemonte", "CN": "Piemonte",
-    "NO": "Piemonte", "TO": "Piemonte", "VB": "Piemonte", "VC": "Piemonte",
+    "AL": "Piemonte",
+    "AT": "Piemonte",
+    "BI": "Piemonte",
+    "CN": "Piemonte",
+    "NO": "Piemonte",
+    "TO": "Piemonte",
+    "VB": "Piemonte",
+    "VC": "Piemonte",
     # Liguria
-    "GE": "Liguria", "IM": "Liguria", "SP": "Liguria", "SV": "Liguria",
+    "GE": "Liguria",
+    "IM": "Liguria",
+    "SP": "Liguria",
+    "SV": "Liguria",
     # Lombardia
-    "BG": "Lombardia", "BS": "Lombardia", "CO": "Lombardia", "CR": "Lombardia",
-    "LC": "Lombardia", "LO": "Lombardia", "MB": "Lombardia", "MI": "Lombardia",
-    "MN": "Lombardia", "PV": "Lombardia", "SO": "Lombardia", "VA": "Lombardia",
+    "BG": "Lombardia",
+    "BS": "Lombardia",
+    "CO": "Lombardia",
+    "CR": "Lombardia",
+    "LC": "Lombardia",
+    "LO": "Lombardia",
+    "MB": "Lombardia",
+    "MI": "Lombardia",
+    "MN": "Lombardia",
+    "PV": "Lombardia",
+    "SO": "Lombardia",
+    "VA": "Lombardia",
     # Trentino-Alto Adige
-    "BZ": "Trentino-Alto Adige", "TN": "Trentino-Alto Adige",
+    "BZ": "Trentino-Alto Adige",
+    "TN": "Trentino-Alto Adige",
     # Veneto
-    "BL": "Veneto", "PD": "Veneto", "RO": "Veneto", "TV": "Veneto",
-    "VE": "Veneto", "VI": "Veneto", "VR": "Veneto",
+    "BL": "Veneto",
+    "PD": "Veneto",
+    "RO": "Veneto",
+    "TV": "Veneto",
+    "VE": "Veneto",
+    "VI": "Veneto",
+    "VR": "Veneto",
     # Friuli-Venezia Giulia
-    "GO": "Friuli-Venezia Giulia", "PN": "Friuli-Venezia Giulia",
-    "TS": "Friuli-Venezia Giulia", "UD": "Friuli-Venezia Giulia",
+    "GO": "Friuli-Venezia Giulia",
+    "PN": "Friuli-Venezia Giulia",
+    "TS": "Friuli-Venezia Giulia",
+    "UD": "Friuli-Venezia Giulia",
     # Emilia-Romagna
-    "BO": "Emilia-Romagna", "FE": "Emilia-Romagna", "FC": "Emilia-Romagna",
-    "MO": "Emilia-Romagna", "PR": "Emilia-Romagna", "PC": "Emilia-Romagna",
-    "RA": "Emilia-Romagna", "RE": "Emilia-Romagna", "RN": "Emilia-Romagna",
+    "BO": "Emilia-Romagna",
+    "FE": "Emilia-Romagna",
+    "FC": "Emilia-Romagna",
+    "MO": "Emilia-Romagna",
+    "PR": "Emilia-Romagna",
+    "PC": "Emilia-Romagna",
+    "RA": "Emilia-Romagna",
+    "RE": "Emilia-Romagna",
+    "RN": "Emilia-Romagna",
     # Toscana
-    "AR": "Toscana", "FI": "Toscana", "GR": "Toscana", "LI": "Toscana",
-    "LU": "Toscana", "MS": "Toscana", "PI": "Toscana", "PT": "Toscana",
-    "PO": "Toscana", "SI": "Toscana",
+    "AR": "Toscana",
+    "FI": "Toscana",
+    "GR": "Toscana",
+    "LI": "Toscana",
+    "LU": "Toscana",
+    "MS": "Toscana",
+    "PI": "Toscana",
+    "PT": "Toscana",
+    "PO": "Toscana",
+    "SI": "Toscana",
     # Umbria
-    "PG": "Umbria", "TR": "Umbria",
+    "PG": "Umbria",
+    "TR": "Umbria",
     # Marche
-    "AN": "Marche", "AP": "Marche", "FM": "Marche", "MC": "Marche", "PU": "Marche",
+    "AN": "Marche",
+    "AP": "Marche",
+    "FM": "Marche",
+    "MC": "Marche",
+    "PU": "Marche",
     # Lazio
-    "FR": "Lazio", "LT": "Lazio", "RI": "Lazio", "RM": "Lazio", "VT": "Lazio",
+    "FR": "Lazio",
+    "LT": "Lazio",
+    "RI": "Lazio",
+    "RM": "Lazio",
+    "VT": "Lazio",
     # Abruzzo
-    "AQ": "Abruzzo", "CH": "Abruzzo", "PE": "Abruzzo", "TE": "Abruzzo",
+    "AQ": "Abruzzo",
+    "CH": "Abruzzo",
+    "PE": "Abruzzo",
+    "TE": "Abruzzo",
     # Molise
-    "CB": "Molise", "IS": "Molise",
+    "CB": "Molise",
+    "IS": "Molise",
     # Campania
-    "AV": "Campania", "BN": "Campania", "CE": "Campania", "NA": "Campania", "SA": "Campania",
+    "AV": "Campania",
+    "BN": "Campania",
+    "CE": "Campania",
+    "NA": "Campania",
+    "SA": "Campania",
     # Puglia
-    "BA": "Puglia", "BT": "Puglia", "BR": "Puglia", "FG": "Puglia",
-    "LE": "Puglia", "TA": "Puglia",
+    "BA": "Puglia",
+    "BT": "Puglia",
+    "BR": "Puglia",
+    "FG": "Puglia",
+    "LE": "Puglia",
+    "TA": "Puglia",
     # Basilicata
-    "MT": "Basilicata", "PZ": "Basilicata",
+    "MT": "Basilicata",
+    "PZ": "Basilicata",
     # Calabria
-    "CZ": "Calabria", "CS": "Calabria", "KR": "Calabria", "RC": "Calabria", "VV": "Calabria",
+    "CZ": "Calabria",
+    "CS": "Calabria",
+    "KR": "Calabria",
+    "RC": "Calabria",
+    "VV": "Calabria",
     # Sicilia
-    "AG": "Sicilia", "CL": "Sicilia", "CT": "Sicilia", "EN": "Sicilia",
-    "ME": "Sicilia", "PA": "Sicilia", "RG": "Sicilia", "SR": "Sicilia", "TP": "Sicilia",
+    "AG": "Sicilia",
+    "CL": "Sicilia",
+    "CT": "Sicilia",
+    "EN": "Sicilia",
+    "ME": "Sicilia",
+    "PA": "Sicilia",
+    "RG": "Sicilia",
+    "SR": "Sicilia",
+    "TP": "Sicilia",
     # Sardegna
-    "CA": "Sardegna", "CI": "Sardegna", "MD": "Sardegna", "NU": "Sardegna",
-    "OG": "Sardegna", "OR": "Sardegna", "OT": "Sardegna", "SS": "Sardegna",
-    "SU": "Sardegna", "VS": "Sardegna",
+    "CA": "Sardegna",
+    "CI": "Sardegna",
+    "MD": "Sardegna",
+    "NU": "Sardegna",
+    "OG": "Sardegna",
+    "OR": "Sardegna",
+    "OT": "Sardegna",
+    "SS": "Sardegna",
+    "SU": "Sardegna",
+    "VS": "Sardegna",
 }
 
 # Extracts sede legale fields from the divSedeLegale container (IDs use SL suffix).
@@ -162,12 +241,16 @@ async def extract_atti_documenti(page: Page) -> list[dict]:
             return []
 
         # Find the nearest table sibling/descendant after the heading
-        table = page.locator('table').filter(has=page.locator('text="Codice pratica"')).first
+        table = (
+            page.locator("table")
+            .filter(has=page.locator('text="Codice pratica"'))
+            .first
+        )
         if await table.count() == 0:
             return []
 
         rows = await table.locator("tbody tr").all()
-        results = []
+        results: list[dict] = []
         for row in rows:
             cells = await row.locator("td").all()
             if len(cells) < 4:
@@ -182,14 +265,16 @@ async def extract_atti_documenti(page: Page) -> list[dict]:
                 anno = int(data_text)
 
             if documento and codice_pratica:
-                results.append({
-                    "documento": documento,
-                    "codice_pratica": codice_pratica,
-                    "tipo": classify_codice_pratica(codice_pratica),
-                    "anno": anno,
-                    "url": None,
-                    "_row_index": len(results),
-                })
+                results.append(
+                    {
+                        "documento": documento,
+                        "codice_pratica": codice_pratica,
+                        "tipo": classify_codice_pratica(codice_pratica),
+                        "anno": anno,
+                        "url": None,
+                        "_row_index": len(results),
+                    }
+                )
         return results
     except Exception as exc:
         logger.debug("extract_atti_documenti error: %s", exc)
@@ -211,8 +296,18 @@ def _strip_p7m(path: "Path") -> "Path":
 
     out_path = _Path(str(path)[:-4])  # remove .p7m
     subprocess.run(
-        ["openssl", "cms", "-verify", "-noverify", "-inform", "DER",
-         "-in", str(path), "-out", str(out_path)],
+        [
+            "openssl",
+            "cms",
+            "-verify",
+            "-noverify",
+            "-inform",
+            "DER",
+            "-in",
+            str(path),
+            "-out",
+            str(out_path),
+        ],
         check=True,
         capture_output=True,
     )
@@ -255,7 +350,7 @@ async def _playwright_download_allegati(
             download = await dl_info.value
 
             suggested = download.suggested_filename or f"allegato_{idx}.pdf"
-            base_name = f"{att.get('codice_pratica','XX')}_{att.get('anno') or 'nd'}_{suggested}"
+            base_name = f"{att.get('codice_pratica', 'XX')}_{att.get('anno') or 'nd'}_{suggested}"
 
             # Save to a hidden temp file that preserves the extension (needed for .p7m check)
             tmp_path = dest_dir / f".dl_{idx}_{base_name}"
@@ -268,7 +363,9 @@ async def _playwright_download_allegati(
                     base_name = _Path(base_name).stem  # drop .p7m, keep stem
                     logger.info("  Estratto da .p7m → %s", base_name)
                 except Exception as exc:
-                    logger.warning("  Conversione .p7m fallita per %s: %s", base_name, exc)
+                    logger.warning(
+                        "  Conversione .p7m fallita per %s: %s", base_name, exc
+                    )
 
             new_size = tmp_path.stat().st_size
             hasher = hashlib.sha256()
@@ -287,15 +384,17 @@ async def _playwright_download_allegati(
                 if existing_hasher.hexdigest() == new_hash:
                     tmp_path.unlink(missing_ok=True)
                     used_names.add(base_name)
-                    enriched.append({
-                        **att,
-                        "filename": base_name,
-                        "path": str(base_path),
-                        "size": new_size,
-                        "hash_sha256": new_hash,
-                        "mime": "application/pdf",
-                        "url_originale": None,
-                    })
+                    enriched.append(
+                        {
+                            **att,
+                            "filename": base_name,
+                            "path": str(base_path),
+                            "size": new_size,
+                            "hash_sha256": new_hash,
+                            "mime": "application/pdf",
+                            "url_originale": None,
+                        }
+                    )
                     logger.info("↓ Cache hit (disco): %s", base_name)
                     continue
 
@@ -303,24 +402,36 @@ async def _playwright_download_allegati(
             filename = base_name
             counter = 2
             while filename in used_names or (dest_dir / filename).exists():
-                filename = f"{base_name.rsplit('.', 1)[0]}_{counter}.{base_name.rsplit('.', 1)[1]}" if "." in base_name else f"{base_name}_{counter}"
+                filename = (
+                    f"{base_name.rsplit('.', 1)[0]}_{counter}.{base_name.rsplit('.', 1)[1]}"
+                    if "." in base_name
+                    else f"{base_name}_{counter}"
+                )
                 counter += 1
             used_names.add(filename)
             save_path = dest_dir / filename
             tmp_path.rename(save_path)
 
-            enriched.append({
-                **att,
-                "filename": filename,
-                "path": str(save_path),
-                "size": new_size,
-                "hash_sha256": new_hash,
-                "mime": "application/pdf",
-                "url_originale": None,
-            })
+            enriched.append(
+                {
+                    **att,
+                    "filename": filename,
+                    "path": str(save_path),
+                    "size": new_size,
+                    "hash_sha256": new_hash,
+                    "mime": "application/pdf",
+                    "url_originale": None,
+                }
+            )
             logger.info("↓ Scaricato: %s", filename)
         except Exception as exc:
-            logger.warning("Download fallito per allegato row %d (%s/%s): %s", idx, att.get("codice_pratica"), att.get("anno"), exc)
+            logger.warning(
+                "Download fallito per allegato row %d (%s/%s): %s",
+                idx,
+                att.get("codice_pratica"),
+                att.get("anno"),
+                exc,
+            )
             enriched.append({**att, "skip_reason": "download_error"})
 
     return enriched
@@ -333,7 +444,7 @@ async def extract_cariche(page: Page) -> list[dict]:
         if await section.count() == 0:
             return []
 
-        table = page.locator('table').filter(has=page.locator('text="Ruolo"')).first
+        table = page.locator("table").filter(has=page.locator('text="Ruolo"')).first
         if await table.count() == 0:
             return []
 
@@ -349,27 +460,35 @@ async def extract_cariche(page: Page) -> list[dict]:
             nome = (await cells[1].inner_text()).strip() if len(cells) > 1 else None
             cognome = (await cells[2].inner_text()).strip() if len(cells) > 2 else None
             cf = (await cells[3].inner_text()).strip() if len(cells) > 3 else None
-            valid_from = (await cells[4].inner_text()).strip() if len(cells) > 4 else None
-            valid_to_raw = (await cells[5].inner_text()).strip() if len(cells) > 5 else None
+            valid_from = (
+                (await cells[4].inner_text()).strip() if len(cells) > 4 else None
+            )
+            valid_to_raw = (
+                (await cells[5].inner_text()).strip() if len(cells) > 5 else None
+            )
 
             if not ruolo_raw:
                 continue
 
-            results.append({
-                "ruolo": normalize_ruolo(ruolo_raw),
-                "nome": nome or None,
-                "cognome": cognome or None,
-                "codice_fiscale": cf or None,
-                "valid_from": valid_from or None,
-                "valid_to": valid_to_raw or None,
-            })
+            results.append(
+                {
+                    "ruolo": normalize_ruolo(ruolo_raw),
+                    "nome": nome or None,
+                    "cognome": cognome or None,
+                    "codice_fiscale": cf or None,
+                    "valid_from": valid_from or None,
+                    "valid_to": valid_to_raw or None,
+                }
+            )
         return results
     except Exception as exc:
         logger.debug("extract_cariche error: %s", exc)
         return []
 
 
-async def search_enti(page: Page, denominazione: str, codice_fiscale: str | None = None) -> None:
+async def search_enti(
+    page: Page, denominazione: str, codice_fiscale: str | None = None
+) -> None:
     """Navigate to RUNTS, fill search fields and submit."""
     logger.info("Navigazione alla pagina di ricerca RUNTS...")
     await page.goto(SEARCH_URL, wait_until="domcontentloaded")
@@ -415,11 +534,13 @@ async def _collect_row_metadata(page: Page) -> list[dict]:
         cells = await row.locator("td").all()
         if len(cells) < 3:
             continue
-        results.append({
-            "denominazione":    (await cells[0].inner_text()).strip(),
-            "sede_comune":      (await cells[1].inner_text()).strip(),
-            "sezione_registro": (await cells[2].inner_text()).strip(),
-        })
+        results.append(
+            {
+                "denominazione": (await cells[0].inner_text()).strip(),
+                "sede_comune": (await cells[1].inner_text()).strip(),
+                "sezione_registro": (await cells[2].inner_text()).strip(),
+            }
+        )
     return results
 
 
@@ -520,7 +641,9 @@ async def extract_fields(page: Page) -> dict:
     iscr_el = page.locator('[id*="spnIscrittoIl"]').first
     if await iscr_el.count() > 0:
         txt = (await iscr_el.inner_text()).strip()
-        data["data_iscrizione"] = re.sub(r"^Iscritto il\s+", "", txt, flags=re.I) or None
+        data["data_iscrizione"] = (
+            re.sub(r"^Iscritto il\s+", "", txt, flags=re.I) or None
+        )
 
     # General label/value pairs via JavaScript (runs after content is rendered)
     try:
@@ -540,7 +663,8 @@ async def extract_fields(page: Page) -> dict:
         # Simple text-based extraction for rappresentante legale
         m = re.search(
             r"Rappresentante legale\s+S[ìi]\b.*?Nome\s+(\S+).*?Cognome\s+(\S+)",
-            body_text, re.DOTALL | re.IGNORECASE
+            body_text,
+            re.DOTALL | re.IGNORECASE,
         )
         if m and "rappresentante_legale" not in data:
             data["rappresentante_legale"] = f"{m.group(2)} {m.group(1)}"
@@ -554,19 +678,19 @@ async def extract_fields(page: Page) -> dict:
 def _normalize_label(label: str) -> str:
     """Map an Italian label to a DB column name."""
     mapping = {
-        "sezione":              "sezione_registro",
+        "sezione": "sezione_registro",
         "sezione del registro": "sezione_registro",
-        "forma giuridica":      "forma_giuridica",
-        "natura giuridica":     "natura_giuridica",
-        "codice fiscale":       "codice_fiscale",
-        "email pec":            "pec",
-        "sito internet":        "sito_web",
-        "denominazione":        "denominazione",
-        "provincia":            "sede_provincia",
-        "comune":               "sede_comune",
-        "regione":              "sede_regione",
-        "indirizzo":            "sede_indirizzo",
-        "cap":                  "sede_cap",
+        "forma giuridica": "forma_giuridica",
+        "natura giuridica": "natura_giuridica",
+        "codice fiscale": "codice_fiscale",
+        "email pec": "pec",
+        "sito internet": "sito_web",
+        "denominazione": "denominazione",
+        "provincia": "sede_provincia",
+        "comune": "sede_comune",
+        "regione": "sede_regione",
+        "indirizzo": "sede_indirizzo",
+        "cap": "sede_cap",
     }
     key = label.lower().strip()
     for raw, normalized in mapping.items():
@@ -594,7 +718,12 @@ async def run_scraper(
     retry_stats keys: attempt_1, attempt_2, attempt_3, failed_after_retry.
     """
     all_entities: list[dict] = []
-    retry_stats = {"attempt_1": 0, "attempt_2": 0, "attempt_3": 0, "failed_after_retry": 0}
+    retry_stats = {
+        "attempt_1": 0,
+        "attempt_2": 0,
+        "attempt_3": 0,
+        "failed_after_retry": 0,
+    }
 
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=headless)
@@ -616,7 +745,7 @@ async def run_scraper(
 
             if total_items == 0:
                 logger.info("Nessun ente trovato per '%s'.", denominazione)
-                return []
+                return [], {}
 
             logger.info("Trovati %d enti su %d pagine", total_items, total_pages)
 
@@ -630,11 +759,10 @@ async def run_scraper(
 
                 for i in range(num_buttons):
                     meta = row_meta[i] if i < len(row_meta) else {}
-                    den = meta.get("denominazione", f"ente_{len(all_entities)+1}")
+                    den = meta.get("denominazione", f"ente_{len(all_entities) + 1}")
 
                     logger.info(
-                        "Processato [%d/%d] %s",
-                        len(all_entities) + 1, total_items, den
+                        "Processato [%d/%d] %s", len(all_entities) + 1, total_items, den
                     )
 
                     fields = None
@@ -650,13 +778,18 @@ async def run_scraper(
 
                             # The detail content renders after networkidle via DNN JS
                             fields = await extract_fields(page)
-                            fields.update({k: v for k, v in meta.items() if v and k not in fields})
+                            fields.update(
+                                {k: v for k, v in meta.items() if v and k not in fields}
+                            )
                             atti = await extract_atti_documenti(page)
                             if attachments_dir is not None and atti:
                                 id_r = fields.get("id_runts") or den
                                 from pathlib import Path as _Path
+
                                 ente_dir = _Path(attachments_dir) / str(id_r)
-                                atti = await _playwright_download_allegati(page, atti, ente_dir)
+                                atti = await _playwright_download_allegati(
+                                    page, atti, ente_dir
+                                )
                             fields["atti_documenti"] = atti
                             fields["cariche"] = await extract_cariche(page)
                             retry_stats[f"attempt_{attempt + 1}"] += 1
@@ -665,22 +798,33 @@ async def run_scraper(
                             if attempt < 2:
                                 logger.warning(
                                     "Errore su ente '%s' (tentativo %d/3): %s — retry tra %ds",
-                                    den, attempt + 1, exc, 2 ** attempt,
+                                    den,
+                                    attempt + 1,
+                                    exc,
+                                    2**attempt,
                                 )
                                 try:
                                     if "/Ente" in page.url:
                                         await _back_to_results(page)
                                 except Exception:
                                     pass
-                                await asyncio.sleep(2 ** attempt)
+                                await asyncio.sleep(2**attempt)
                             else:
-                                logger.error("Errore definitivo su ente '%s' dopo 3 tentativi: %s", den, exc)
+                                logger.error(
+                                    "Errore definitivo su ente '%s' dopo 3 tentativi: %s",
+                                    den,
+                                    exc,
+                                )
                                 retry_stats["failed_after_retry"] += 1
                                 try:
                                     if "/Ente" in page.url:
                                         await _back_to_results(page)
                                 except Exception:
-                                    await search_enti(page, denominazione, codice_fiscale=codice_fiscale)
+                                    await search_enti(
+                                        page,
+                                        denominazione,
+                                        codice_fiscale=codice_fiscale,
+                                    )
                                     for _ in range(cur - 1):
                                         if not await _go_to_next_page(page):
                                             break
@@ -694,8 +838,13 @@ async def run_scraper(
                         # Return to search results
                         recovered = await _back_to_results(page)
                         if not recovered:
-                            logger.warning("Back navigation failed — re-executing search and navigating to page %d", cur)
-                            await search_enti(page, denominazione, codice_fiscale=codice_fiscale)
+                            logger.warning(
+                                "Back navigation failed — re-executing search and navigating to page %d",
+                                cur,
+                            )
+                            await search_enti(
+                                page, denominazione, codice_fiscale=codice_fiscale
+                            )
                             for _ in range(cur - 1):
                                 if not await _go_to_next_page(page):
                                     break

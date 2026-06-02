@@ -1,7 +1,6 @@
 import json
 import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
 
 SCHEMA = """
@@ -336,7 +335,9 @@ def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
 
     id_runts = data.get("id_runts") or data.get("codice_fiscale")
     if not id_runts:
-        raise ValueError("Record senza id_runts né codice_fiscale, impossibile fare upsert")
+        raise ValueError(
+            "Record senza id_runts né codice_fiscale, impossibile fare upsert"
+        )
 
     existing_row = conn.execute(
         "SELECT lat, lon FROM enti WHERE id_runts = ?", (id_runts,)
@@ -351,12 +352,29 @@ def upsert_ente(conn: sqlite3.Connection, data: dict) -> str:
             data["lon"] = existing_row["lon"]
 
     columns = [
-        "id_runts", "codice_fiscale", "denominazione", "forma_giuridica",
-        "natura_giuridica", "sede_stato", "sede_indirizzo", "sede_civico",
-        "sede_comune", "sede_provincia", "sede_regione", "sede_cap",
-        "lat", "lon", "data_iscrizione", "sezione_registro", "settori_attivita",
-        "rappresentante_legale", "sito_web", "pec",
-        "url_dettaglio", "raw_json", "updated_at",
+        "id_runts",
+        "codice_fiscale",
+        "denominazione",
+        "forma_giuridica",
+        "natura_giuridica",
+        "sede_stato",
+        "sede_indirizzo",
+        "sede_civico",
+        "sede_comune",
+        "sede_provincia",
+        "sede_regione",
+        "sede_cap",
+        "lat",
+        "lon",
+        "data_iscrizione",
+        "sezione_registro",
+        "settori_attivita",
+        "rappresentante_legale",
+        "sito_web",
+        "pec",
+        "url_dettaglio",
+        "raw_json",
+        "updated_at",
     ]
     row = {col: data.get(col) for col in columns}
     if not row["id_runts"]:
@@ -390,9 +408,19 @@ def upsert_allegato(conn: sqlite3.Connection, data: dict) -> str:
         return "cache_hit"
 
     cols = [
-        "id_runts", "documento", "codice_pratica", "tipo", "anno",
-        "filename", "path", "mime", "size", "hash_sha256",
-        "url_originale", "skip_reason", "downloaded_at",
+        "id_runts",
+        "documento",
+        "codice_pratica",
+        "tipo",
+        "anno",
+        "filename",
+        "path",
+        "mime",
+        "size",
+        "hash_sha256",
+        "url_originale",
+        "skip_reason",
+        "downloaded_at",
     ]
     row = {c: data.get(c) for c in cols}
     row["downloaded_at"] = now
@@ -405,13 +433,21 @@ def upsert_allegato(conn: sqlite3.Connection, data: dict) -> str:
 
 
 _NUMERIC_BILANCIO_COLS = [
-    "oneri_a_interesse_generale", "oneri_b_attivita_diverse",
-    "oneri_c_raccolta_fondi", "oneri_d_finanziarie_patrimoniali",
-    "oneri_e_supporto_generale", "totale_oneri",
-    "proventi_a_interesse_generale", "proventi_b_attivita_diverse",
-    "proventi_c_raccolta_fondi", "proventi_d_finanziarie_patrimoniali",
-    "proventi_e_supporto_generale", "totale_proventi",
-    "risultato_ante_imposte", "imposte", "risultato_esercizio",
+    "oneri_a_interesse_generale",
+    "oneri_b_attivita_diverse",
+    "oneri_c_raccolta_fondi",
+    "oneri_d_finanziarie_patrimoniali",
+    "oneri_e_supporto_generale",
+    "totale_oneri",
+    "proventi_a_interesse_generale",
+    "proventi_b_attivita_diverse",
+    "proventi_c_raccolta_fondi",
+    "proventi_d_finanziarie_patrimoniali",
+    "proventi_e_supporto_generale",
+    "totale_proventi",
+    "risultato_ante_imposte",
+    "imposte",
+    "risultato_esercizio",
 ]
 
 
@@ -422,7 +458,11 @@ def upsert_bilancio(conn: sqlite3.Connection, data: dict) -> None:
     incoming value is not None (best-of-all-files wins per field).
     """
     now = datetime.now(timezone.utc).isoformat()
-    cols = ["id_runts", "anno"] + _NUMERIC_BILANCIO_COLS + ["raw_text", "allegato_id", "analyzed_at"]
+    cols = (
+        ["id_runts", "anno"]
+        + _NUMERIC_BILANCIO_COLS
+        + ["raw_text", "allegato_id", "analyzed_at"]
+    )
     row = {c: data.get(c) for c in cols}
     row["analyzed_at"] = now
 
@@ -449,7 +489,9 @@ def upsert_bilancio(conn: sqlite3.Connection, data: dict) -> None:
     conn.commit()
 
 
-def sync_cariche(conn: sqlite3.Connection, id_runts: str, cariche_new: list[dict]) -> None:
+def sync_cariche(
+    conn: sqlite3.Connection, id_runts: str, cariche_new: list[dict]
+) -> None:
     """Sync active charges: close removed ones, insert new ones, leave unchanged ones."""
     today = datetime.now(timezone.utc).date().isoformat()
     now = datetime.now(timezone.utc).isoformat()
@@ -465,12 +507,22 @@ def sync_cariche(conn: sqlite3.Connection, id_runts: str, cariche_new: list[dict
             cf = row_or_dict.get("codice_fiscale")
             if cf:
                 return (cf, row_or_dict.get("ruolo"), row_or_dict.get("valid_from"))
-            return (row_or_dict.get("nome"), row_or_dict.get("cognome"), row_or_dict.get("ruolo"), row_or_dict.get("valid_from"))
+            return (
+                row_or_dict.get("nome"),
+                row_or_dict.get("cognome"),
+                row_or_dict.get("ruolo"),
+                row_or_dict.get("valid_from"),
+            )
         else:
             cf = row_or_dict["codice_fiscale"]
             if cf:
                 return (cf, row_or_dict["ruolo"], row_or_dict["valid_from"])
-            return (row_or_dict["nome"], row_or_dict["cognome"], row_or_dict["ruolo"], row_or_dict["valid_from"])
+            return (
+                row_or_dict["nome"],
+                row_or_dict["cognome"],
+                row_or_dict["ruolo"],
+                row_or_dict["valid_from"],
+            )
 
     new_keys = {_key(c, is_dict=True) for c in cariche_new}
 
@@ -512,14 +564,30 @@ def upsert_sezione_cai(conn: sqlite3.Connection, data: dict) -> str:
     """Insert or replace a CAI section. Returns 'inserted' or 'updated'."""
     now = datetime.now(timezone.utc).isoformat()
     cols = [
-        "codice_cai", "cai_denominazione", "cai_codice_fiscale", "cai_partita_iva",
-        "cai_email", "cai_pec", "cai_telefono_sede", "cai_telefono", "cai_fax",
-        "cai_indirizzo_sede", "cai_indirizzo_postale", "cai_sito_web", "cai_orari",
-        "cai_avvisi", "cai_anno_fondazione", "cai_soci_ultimo_anno",
-        "cai_lat", "cai_lon", "cai_regione", "cai_scraped_at",
+        "codice_cai",
+        "cai_denominazione",
+        "cai_codice_fiscale",
+        "cai_partita_iva",
+        "cai_email",
+        "cai_pec",
+        "cai_telefono_sede",
+        "cai_telefono",
+        "cai_fax",
+        "cai_indirizzo_sede",
+        "cai_indirizzo_postale",
+        "cai_sito_web",
+        "cai_orari",
+        "cai_avvisi",
+        "cai_anno_fondazione",
+        "cai_soci_ultimo_anno",
+        "cai_lat",
+        "cai_lon",
+        "cai_regione",
+        "cai_scraped_at",
     ]
     existing = conn.execute(
-        "SELECT codice_cai FROM sezioni_cai WHERE codice_cai = ?", (data.get("codice_cai"),)
+        "SELECT codice_cai FROM sezioni_cai WHERE codice_cai = ?",
+        (data.get("codice_cai"),),
     ).fetchone()
     action = "updated" if existing else "inserted"
     row = {c: data.get(c) for c in cols}
@@ -537,13 +605,26 @@ def upsert_gruppo_regionale(conn: sqlite3.Connection, data: dict) -> str:
     """Insert or replace a CAI regional group. Returns 'inserted' or 'updated'."""
     now = datetime.now(timezone.utc).isoformat()
     cols = [
-        "gr_codice", "gr_nome", "gr_codice_fiscale", "gr_partita_iva",
-        "gr_email", "gr_pec", "gr_telefono_sede", "gr_telefono", "gr_fax",
-        "gr_indirizzo_sede", "gr_indirizzo_postale", "gr_sito_web",
-        "gr_descrizione", "gr_soci_ultimo_anno", "gr_scraped_at", "gr_id_runts",
+        "gr_codice",
+        "gr_nome",
+        "gr_codice_fiscale",
+        "gr_partita_iva",
+        "gr_email",
+        "gr_pec",
+        "gr_telefono_sede",
+        "gr_telefono",
+        "gr_fax",
+        "gr_indirizzo_sede",
+        "gr_indirizzo_postale",
+        "gr_sito_web",
+        "gr_descrizione",
+        "gr_soci_ultimo_anno",
+        "gr_scraped_at",
+        "gr_id_runts",
     ]
     existing = conn.execute(
-        "SELECT gr_codice FROM gruppi_regionali_cai WHERE gr_codice = ?", (data.get("gr_codice"),)
+        "SELECT gr_codice FROM gruppi_regionali_cai WHERE gr_codice = ?",
+        (data.get("gr_codice"),),
     ).fetchone()
     action = "updated" if existing else "inserted"
     row = {c: data.get(c) for c in cols}
@@ -561,13 +642,25 @@ def upsert_sottosezione_cai(conn: sqlite3.Connection, data: dict) -> str:
     """Insert or replace a CAI sub-section. Returns 'inserted' or 'updated'."""
     now = datetime.now(timezone.utc).isoformat()
     cols = [
-        "cai_codice", "cai_sezione_codice", "cai_nome", "cai_email",
-        "cai_telefono_sede", "cai_telefono", "cai_indirizzo_sede", "cai_sito_web",
-        "cai_orari", "cai_avvisi", "cai_anno_fondazione", "cai_soci",
-        "cai_lat", "cai_lon", "cai_scraped_at",
+        "cai_codice",
+        "cai_sezione_codice",
+        "cai_nome",
+        "cai_email",
+        "cai_telefono_sede",
+        "cai_telefono",
+        "cai_indirizzo_sede",
+        "cai_sito_web",
+        "cai_orari",
+        "cai_avvisi",
+        "cai_anno_fondazione",
+        "cai_soci",
+        "cai_lat",
+        "cai_lon",
+        "cai_scraped_at",
     ]
     existing = conn.execute(
-        "SELECT cai_codice FROM sottosezioni_cai WHERE cai_codice = ?", (data.get("cai_codice"),)
+        "SELECT cai_codice FROM sottosezioni_cai WHERE cai_codice = ?",
+        (data.get("cai_codice"),),
     ).fetchone()
     action = "updated" if existing else "inserted"
     row = {c: data.get(c) for c in cols}
