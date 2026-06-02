@@ -1,0 +1,204 @@
+{
+  "project": "RUNTS-CAI",
+  "branchName": "ralph/stats",
+  "description": "Dashboard statistiche /stats: 7 KPI card, mappa coropleta D3, bar/line/donut Chart.js, tabelle top10, copertura ETS, qualità dati. Dati JSON inline server-side.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "KPI riepilogo esteso — 7 card",
+      "description": "As a user, I want to see the key numbers at a glance so that I can immediately understand the scale of the CAI network.",
+      "acceptanceCriteria": [
+        "La route GET /stats in web/app.py calcola: sezioni_totali (529), soci_totali (SUM cai_soci_ultimo_anno), enti_ets (226), ets_agganciati (COUNT JOIN sezioni_cai), gr_totali (21), gr_agganciati (COUNT WHERE gr_id_runts IS NOT NULL), copertura_bilanci_pct (round(enti_con_bilanci/enti_ets*100,1))",
+        "web/templates/stats.html sostituisce le 4 card attuali con 7 card Bootstrap col-sm-6 col-lg: Sezioni CAI, Soci totali, Enti ETS, ETS agganciati (badge X/226), GR agganciati (badge 5/21), Bilanci analizzati, Copertura bilanci %",
+        "Rimosso il testo 'In costruzione'",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Backend — aggregazioni SQL per tutti i grafici",
+      "description": "As a developer, I need all chart data pre-computed server-side and serialized as JSON so that the template can render charts without AJAX calls.",
+      "acceptanceCriteria": [
+        "La route /stats calcola soci_per_regione: SELECT cai_regione, COUNT(*) n_sezioni, SUM(cai_soci_ultimo_anno) soci FROM sezioni_cai WHERE cai_regione != '' GROUP BY cai_regione ORDER BY soci DESC",
+        "Calcola proventi_2024_per_regione: SELECT e.sede_regione, SUM(b.totale_proventi) FROM bilanci b JOIN enti e ON b.id_runts=e.id_runts WHERE b.anno=2024 AND b.totale_proventi IS NOT NULL GROUP BY e.sede_regione ORDER BY 2 DESC",
+        "Calcola top10_soci: SELECT codice_cai, cai_denominazione, cai_soci_ultimo_anno FROM sezioni_cai WHERE cai_soci_ultimo_anno IS NOT NULL ORDER BY cai_soci_ultimo_anno DESC LIMIT 10",
+        "Calcola top10_sottosezioni: SELECT sc.codice_cai, sc.cai_denominazione, COUNT(*) n FROM sottosezioni_cai ss JOIN sezioni_cai sc ON ss.cai_sezione_codice=sc.codice_cai GROUP BY ss.cai_sezione_codice ORDER BY n DESC LIMIT 10",
+        "Calcola allegati_per_tipo: SELECT tipo, COUNT(*) n FROM allegati GROUP BY tipo ORDER BY n DESC",
+        "Calcola bilanci_per_ente: per ogni ente con >= 2 anni di totale_proventi non null, lista {id_runts, denominazione, punti: [{anno, totale_proventi}]}",
+        "Calcola copertura_ets dict: {totale:226, agganciati: COUNT JOIN, con_bilanci: COUNT DISTINCT bilanci.id_runts, con_allegati: COUNT DISTINCT allegati.id_runts, con_coordinate: COUNT WHERE lat IS NOT NULL}",
+        "Calcola qualita_dati: lista 4 dict {label, n, url}: sezioni senza CF CAI (WHERE cai_codice_fiscale IS NULL, url=/?issues=1), ETS non agganciati (LEFT JOIN NULL, url=/ets), sezioni senza soci (WHERE cai_soci_ultimo_anno IS NULL OR =0, url=/?issues=1), GR non agganciati (WHERE gr_id_runts IS NULL, url=/gruppi-regionali)",
+        "Tutti i dati passati al template come variabili Jinja2; il template li serializza con | tojson per l'uso in JavaScript",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "GeoJSON regioni italiane + StaticFiles",
+      "description": "As a developer, I need the Italian regions GeoJSON served as a static file so that D3 can render the choropleth map.",
+      "acceptanceCriteria": [
+        "Creare la directory web/static/ se non esiste",
+        "Scaricare il GeoJSON delle regioni italiane (usare fetch o requests in uno script di setup, oppure includerlo direttamente) e salvarlo in web/static/it-regions.geojson. Source consigliata: https://raw.githubusercontent.com/openpolis/geoboundaries-ita/main/geojson/limits_IT_regions.geojson",
+        "In web/app.py, aggiungere app.mount('/static', StaticFiles(directory='web/static'), name='static') se non già presente",
+        "GET /static/it-regions.geojson risponde 200 con Content-Type application/json",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Bar chart orizzontale — soci per regione (Chart.js)",
+      "description": "As a user, I want to see how members are distributed across regions so that I can understand the geographic weight of each area.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Soci per regione' con <canvas id='chart-soci-regione' height='300'>",
+        "Chart.js horizontal bar: labels = regioni ordinate per soci DESC, data = soci, backgroundColor = rgba(13,110,253,0.7)",
+        "Tooltip mostra: 'X soci — Y sezioni'",
+        "Chart.js incluso via CDN <script src='https://cdn.jsdelivr.net/npm/chart.js'> nel {% block head %} di stats.html",
+        "Dati da variabile Jinja2: var socipReg = {{ soci_per_regione | tojson }};",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 4,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Tabella top 10 sezioni per soci con progress bar",
+      "description": "As a user, I want to see the largest sections by membership so that I know the heavyweights of the network.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Top 10 sezioni per numero soci' con tabella Bootstrap table-sm: colonne Pos, Denominazione (link /sezione/<codice_cai>), Soci, Barra",
+        "Colonna Barra: <div class='progress' style='height:8px'><div class='progress-bar' style='width:X%'> dove X = soci/28992*100 (max = SAT 28.992)",
+        "Dati da variabile {{ top10_soci | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 5,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Progress bars — copertura dati ETS",
+      "description": "As a user, I want to see data coverage for ETS entities so that I know how complete the dataset is.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Copertura dati ETS' con 4 righe: Agganciati a sezione CAI (184/226), Con bilanci analizzati (20/226), Con allegati scaricati (21/226), Con coordinate geografiche (226/226)",
+        "Ogni riga: label col-4, progress-bar col-6 Bootstrap con larghezza proporzionale, testo 'X/226 (Y%)' col-2",
+        "Colori: bg-success per >=80%, bg-warning per 20-79%, bg-danger per <20%",
+        "Dati da variabile {{ copertura_ets | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 6,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Bar chart verticale — proventi ETS 2024 per regione (Chart.js)",
+      "description": "As a user, I want to see the financial distribution by region so that I know which areas have the most complete financial data.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Proventi ETS 2024 per regione' con <canvas id='chart-proventi-regione'>",
+        "Chart.js vertical bar: asse X = regioni, asse Y = totale_proventi in €, colore rgba(25,135,84,0.7)",
+        "Tooltip mostra il valore formattato come '€ X.XXX.XXX'",
+        "Nota sotto il grafico: <p class='text-muted small'>Dati parziali — solo enti con bilancio 2024 analizzato</p>",
+        "Dati da variabile {{ proventi_2024_per_regione | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 7,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Line chart evoluzione proventi + select singolo ente (Chart.js)",
+      "description": "As a user, I want to select an entity and see its revenue trend over the years so that I can assess financial trajectory.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Evoluzione proventi nel tempo' con <select id='sel-ente'> popolato con gli enti di bilanci_per_ente (label = denominazione)",
+        "<canvas id='chart-proventi-tempo'> con line chart Chart.js: asse X = anni 2021-2025, asse Y = totale_proventi €, punto per ogni anno con dato",
+        "Cambiando la select, aggiorna chart.data.datasets[0].data e chart.update() senza ricaricare la pagina",
+        "All'avvio mostra il primo ente della lista (Bologna Mario Fantin)",
+        "Dati da var bilanciEnte = {{ bilanci_per_ente | tojson }};",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 8,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Donut chart — distribuzione allegati per tipo (Chart.js)",
+      "description": "As a user, I want to see the breakdown of attachment types so that I know what document coverage we have.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Distribuzione allegati per tipo' con <canvas id='chart-allegati-tipo'>",
+        "Chart.js doughnut: segmenti per tipo con colori Bootstrap distinti (8 colori), legenda destra con tipo e conteggio",
+        "Dati da {{ allegati_per_tipo | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 9,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Tabella top 10 sezioni per sottosezioni con progress bar",
+      "description": "As a user, I want to see which sections have the most sub-sections so that I understand the network hierarchy.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Sezioni con più sottosezioni' con tabella: Pos, Denominazione (link /sezione/<codice_cai>?tab=sottosezioni), N. sottosezioni, barra progress proporzionale al max (Bergamo=30)",
+        "Dati da {{ top10_sottosezioni | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 10,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Tabella qualità dati con link ai filtri",
+      "description": "As a user, I want to see known data quality issues with direct links to filtered views so that I can act on them immediately.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Qualità dati' con tabella Bootstrap: colonne Problema, N. elementi, Azione",
+        "4 righe: 'Sezioni senza CF nel registro CAI' (n, link /?issues=1), 'Enti ETS non agganciati a sezione CAI' (n, link /ets), 'Sezioni CAI senza dati soci' (n, link /?issues=1), 'Gruppi Regionali non agganciati RUNTS' (n, link /gruppi-regionali)",
+        "Colonna N: badge bg-warning se n>0, bg-success se n=0",
+        "Colonna Azione: <a href='...'>Vedi →</a>",
+        "Dati da {{ qualita_dati | tojson }}",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Mappa coropleta regioni italiane (D3 + GeoJSON)",
+      "description": "As a user, I want to see a color-coded map of Italy showing sections per region so that I can understand geographic distribution at a glance.",
+      "acceptanceCriteria": [
+        "In stats.html, sezione 'Sezioni CAI per regione' con <div id='map-regioni' style='height:420px'>",
+        "D3.js 7.x incluso via CDN nel {% block head %}: <script src='https://cdn.jsdelivr.net/npm/d3@7'>",
+        "D3 carica /static/it-regions.geojson via d3.json(), proietta con d3.geoMercator() centrata sull'Italia, colora ogni regione con d3.scaleSequential(d3.interpolateBlues) proporzionale a n_sezioni (0=bianco, 152=blu scuro)",
+        "Dizionario JS di normalizzazione nomi GeoJSON -> DB (es. {'Trentino-Alto Adige/Südtirol': 'TRENTINO-ALTO ADIGE', 'Valle d\\'Aosta/Vallée d\\'Aoste': 'VALLE D\\'AOSTA'})",
+        "Tooltip on hover: mostra REGIONE, n sezioni, soci totali",
+        "Regioni senza dati nel DB colorate in grigio chiaro #eee",
+        "Dati da var sociRegMap = {{ soci_per_regione | tojson }};",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": true,
+      "notes": ""
+    }
+  ]
+}
