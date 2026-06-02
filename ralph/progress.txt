@@ -153,6 +153,18 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-001 (ralph/devops branch)
+- Added route GET `/health` to `web/app.py`: checks `_db_exists()`, then runs `SELECT COUNT(*) FROM enti`, returns 200 `{status: ok, enti: N}` or 503 `{status: error, detail: ...}`
+- Added `JSONResponse` import from `fastapi.responses`
+- Added healthcheck to `docker-compose.yml`: `test: ["CMD", "curl", "-f", "http://localhost:8000/health"]`, interval: 30s, timeout: 5s, retries: 3
+- Files changed: `web/app.py`, `docker-compose.yml`
+- **Learnings for future iterations:**
+  - `JSONResponse` must be imported explicitly from `fastapi.responses` alongside `HTMLResponse`
+  - The health endpoint catches any DB exception (table missing, permissions, etc.) and returns 503 with the exception detail — no need to check table existence explicitly
+  - The endpoint is placed before the `# ---------- API endpoints ----------` section for logical grouping
+  - Manual browser verification needed (no browser tools)
+---
+
 ## Codebase Patterns
 - Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
 - FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`

@@ -1,18 +1,19 @@
 {
   "project": "RUNTS-CAI",
-  "branchName": "ralph/stats",
-  "description": "Dashboard statistiche /stats: 7 KPI card, mappa coropleta D3, bar/line/donut Chart.js, tabelle top10, copertura ETS, qualità dati. Dati JSON inline server-side.",
+  "branchName": "ralph/devops",
+  "description": "DevOps baseline: healthcheck /health, pre-commit (ruff+mypy+pytest), bump-version script, devcontainer, GitHub Actions CI/CD su ghcr.io/piccioli/runts, deploy SSH su Hetzner UAT (135.181.25.33) e PROD (178.105.78.67).",
   "userStories": [
     {
       "id": "US-001",
-      "title": "KPI riepilogo esteso — 7 card",
-      "description": "As a user, I want to see the key numbers at a glance so that I can immediately understand the scale of the CAI network.",
+      "title": "Endpoint /health per Docker healthcheck",
+      "description": "As an operator, I want a /health endpoint so that Docker can verify the app is running correctly.",
       "acceptanceCriteria": [
-        "La route GET /stats in web/app.py calcola: sezioni_totali (529), soci_totali (SUM cai_soci_ultimo_anno), enti_ets (226), ets_agganciati (COUNT JOIN sezioni_cai), gr_totali (21), gr_agganciati (COUNT WHERE gr_id_runts IS NOT NULL), copertura_bilanci_pct (round(enti_con_bilanci/enti_ets*100,1))",
-        "web/templates/stats.html sostituisce le 4 card attuali con 7 card Bootstrap col-sm-6 col-lg: Sezioni CAI, Soci totali, Enti ETS, ETS agganciati (badge X/226), GR agganciati (badge 5/21), Bilanci analizzati, Copertura bilanci %",
-        "Rimosso il testo 'In costruzione'",
+        "Aggiungere route GET /health in web/app.py: esegue SELECT COUNT(*) FROM enti sul DB",
+        "Risponde 200 {\"status\": \"ok\", \"enti\": N} se DB raggiungibile e N > 0",
+        "Risponde 503 {\"status\": \"error\", \"detail\": \"...\"} se DB non raggiungibile o N == 0",
+        "Aggiungere a docker-compose.yml: healthcheck: test: [\"CMD\", \"curl\", \"-f\", \"http://localhost:8000/health\"], interval: 30s, timeout: 5s, retries: 3",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Verify in browser: GET /health risponde 200 con JSON {status: ok, enti: N}"
       ],
       "priority": 1,
       "passes": true,
@@ -20,184 +21,126 @@
     },
     {
       "id": "US-002",
-      "title": "Backend — aggregazioni SQL per tutti i grafici",
-      "description": "As a developer, I need all chart data pre-computed server-side and serialized as JSON so that the template can render charts without AJAX calls.",
+      "title": "pre-commit framework con ruff, ruff-format, mypy, pytest",
+      "description": "As a developer, I want automated linting and type checks on every commit so that code quality issues are caught before they reach the repo.",
       "acceptanceCriteria": [
-        "La route /stats calcola soci_per_regione: SELECT cai_regione, COUNT(*) n_sezioni, SUM(cai_soci_ultimo_anno) soci FROM sezioni_cai WHERE cai_regione != '' GROUP BY cai_regione ORDER BY soci DESC",
-        "Calcola proventi_2024_per_regione: SELECT e.sede_regione, SUM(b.totale_proventi) FROM bilanci b JOIN enti e ON b.id_runts=e.id_runts WHERE b.anno=2024 AND b.totale_proventi IS NOT NULL GROUP BY e.sede_regione ORDER BY 2 DESC",
-        "Calcola top10_soci: SELECT codice_cai, cai_denominazione, cai_soci_ultimo_anno FROM sezioni_cai WHERE cai_soci_ultimo_anno IS NOT NULL ORDER BY cai_soci_ultimo_anno DESC LIMIT 10",
-        "Calcola top10_sottosezioni: SELECT sc.codice_cai, sc.cai_denominazione, COUNT(*) n FROM sottosezioni_cai ss JOIN sezioni_cai sc ON ss.cai_sezione_codice=sc.codice_cai GROUP BY ss.cai_sezione_codice ORDER BY n DESC LIMIT 10",
-        "Calcola allegati_per_tipo: SELECT tipo, COUNT(*) n FROM allegati GROUP BY tipo ORDER BY n DESC",
-        "Calcola bilanci_per_ente: per ogni ente con >= 2 anni di totale_proventi non null, lista {id_runts, denominazione, punti: [{anno, totale_proventi}]}",
-        "Calcola copertura_ets dict: {totale:226, agganciati: COUNT JOIN, con_bilanci: COUNT DISTINCT bilanci.id_runts, con_allegati: COUNT DISTINCT allegati.id_runts, con_coordinate: COUNT WHERE lat IS NOT NULL}",
-        "Calcola qualita_dati: lista 4 dict {label, n, url}: sezioni senza CF CAI (WHERE cai_codice_fiscale IS NULL, url=/?issues=1), ETS non agganciati (LEFT JOIN NULL, url=/ets), sezioni senza soci (WHERE cai_soci_ultimo_anno IS NULL OR =0, url=/?issues=1), GR non agganciati (WHERE gr_id_runts IS NULL, url=/gruppi-regionali)",
-        "Tutti i dati passati al template come variabili Jinja2; il template li serializza con | tojson per l'uso in JavaScript",
+        "Creare .pre-commit-config.yaml nella root del progetto con i seguenti hooks in ordine: (1) ruff check --fix, (2) ruff format, (3) mypy su scraper/ e web/, (4) hook locale che esegue python -m pytest scraper/test_sede_legale.py scraper/test_upsert.py -v --tb=short usando il venv .venv/bin/python3",
+        "Il vecchio .git/hooks/pre-commit viene sostituito da pre-commit install (documentare nel README)",
+        "pre-commit run --all-files passa senza errori sul codebase attuale — se ruff o mypy trovano errori, fixarli prima di committare .pre-commit-config.yaml",
+        "Aggiungere pre-commit al requirements-dev.txt (crearlo se non esiste)",
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-003",
-      "title": "GeoJSON regioni italiane + StaticFiles",
-      "description": "As a developer, I need the Italian regions GeoJSON served as a static file so that D3 can render the choropleth map.",
+      "title": "FILE VERSION + scripts/bump-version.sh + CHANGELOG.md",
+      "description": "As a developer, I want a version bump script so that I can release new versions with a single command.",
       "acceptanceCriteria": [
-        "Creare la directory web/static/ se non esiste",
-        "Scaricare il GeoJSON delle regioni italiane (usare fetch o requests in uno script di setup, oppure includerlo direttamente) e salvarlo in web/static/it-regions.geojson. Source consigliata: https://raw.githubusercontent.com/openpolis/geoboundaries-ita/main/geojson/limits_IT_regions.geojson",
-        "In web/app.py, aggiungere app.mount('/static', StaticFiles(directory='web/static'), name='static') se non già presente",
-        "GET /static/it-regions.geojson risponde 200 con Content-Type application/json",
+        "Creare file VERSION nella root con contenuto: 0.1.0",
+        "Creare CHANGELOG.md con sezione iniziale: ## [0.1.0] - 2026-06-02\\n\\n### Note\\n- Prima release di sviluppo",
+        "Creare scripts/bump-version.sh che: accetta argomento major|minor|patch, legge VERSION, incrementa il componente, scrive la nuova versione in VERSION, prepende una nuova sezione in CHANGELOG.md con formato ## [X.Y.Z] - YYYY-MM-DD, esegue git add VERSION CHANGELOG.md && git commit -m 'chore: bump version to vX.Y.Z', crea git tag vX.Y.Z",
+        "chmod +x scripts/bump-version.sh",
+        "Testare: bash scripts/bump-version.sh patch produce VERSION=0.1.1 e tag v0.1.1 (poi riportare a 0.1.0 con git reset se necessario)",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-004",
-      "title": "Bar chart orizzontale — soci per regione (Chart.js)",
-      "description": "As a user, I want to see how members are distributed across regions so that I can understand the geographic weight of each area.",
+      "title": "Dev container VS Code (.devcontainer/)",
+      "description": "As a developer, I want a dev container configuration so that I can start coding in a reproducible environment without manual setup.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Soci per regione' con <canvas id='chart-soci-regione' height='300'>",
-        "Chart.js horizontal bar: labels = regioni ordinate per soci DESC, data = soci, backgroundColor = rgba(13,110,253,0.7)",
-        "Tooltip mostra: 'X soci — Y sezioni'",
-        "Chart.js incluso via CDN <script src='https://cdn.jsdelivr.net/npm/chart.js'> nel {% block head %} di stats.html",
-        "Dati da variabile Jinja2: var socipReg = {{ soci_per_regione | tojson }};",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare .devcontainer/devcontainer.json con: name=RUNTS-CAI, build.dockerfile=Dockerfile, postCreateCommand che esegue pip install -r scraper/requirements.txt -r web/requirements.txt && pre-commit install && playwright install chromium --with-deps",
+        "Creare .devcontainer/Dockerfile basato su python:3.12, installa curl, git, e le dipendenze di sistema per Playwright (libglib2.0, libnss3, ecc.) via apt-get",
+        "Aggiungere customizations.vscode.extensions: ms-python.python, charliermarsh.ruff, ms-python.mypy-type-stubs",
+        "Aggiungere nota nel README.md nella sezione di setup: 'Dev container disponibile — aprire in VS Code e selezionare Reopen in Container'",
+        "Typecheck passes"
       ],
       "priority": 4,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-005",
-      "title": "Tabella top 10 sezioni per soci con progress bar",
-      "description": "As a user, I want to see the largest sections by membership so that I know the heavyweights of the network.",
+      "title": "GitHub Actions CI — lint, test, build su ogni push",
+      "description": "As a developer, I want a CI pipeline that runs on every push so that broken code is caught before merge.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Top 10 sezioni per numero soci' con tabella Bootstrap table-sm: colonne Pos, Denominazione (link /sezione/<codice_cai>), Soci, Barra",
-        "Colonna Barra: <div class='progress' style='height:8px'><div class='progress-bar' style='width:X%'> dove X = soci/28992*100 (max = SAT 28.992)",
-        "Dati da variabile {{ top10_soci | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare .github/workflows/ci.yml che si attiva su push e pull_request verso qualsiasi branch",
+        "Job lint-test: usa ubuntu-latest, python 3.12, installa requirements con pip, esegue pre-commit run --all-files, poi pytest scraper/test_sede_legale.py scraper/test_upsert.py -v",
+        "Job build: usa ubuntu-latest, esegue docker build -t runts:test . e verifica che l'immagine parta con docker run --rm runts:test python -c 'import uvicorn; print(\"ok\")'",
+        "I due job girano in parallelo (non dipendono l'uno dall'altro)",
+        "Typecheck passes"
       ],
       "priority": 5,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-006",
-      "title": "Progress bars — copertura dati ETS",
-      "description": "As a user, I want to see data coverage for ETS entities so that I know how complete the dataset is.",
+      "title": "GitHub Actions — build e push immagine su ghcr.io/piccioli/runts",
+      "description": "As a developer, I want the Docker image pushed to GitHub Container Registry on every merge to develop or prod.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Copertura dati ETS' con 4 righe: Agganciati a sezione CAI (184/226), Con bilanci analizzati (20/226), Con allegati scaricati (21/226), Con coordinate geografiche (226/226)",
-        "Ogni riga: label col-4, progress-bar col-6 Bootstrap con larghezza proporzionale, testo 'X/226 (Y%)' col-2",
-        "Colori: bg-success per >=80%, bg-warning per 20-79%, bg-danger per <20%",
-        "Dati da variabile {{ copertura_ets | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare .github/workflows/publish.yml che si attiva su push ai branch develop e prod",
+        "Permissions: contents: read, packages: write",
+        "Login su ghcr.io con GITHUB_TOKEN usando docker/login-action@v3",
+        "Build e push con docker/build-push-action@v5 con cache (cache-from: type=gha, cache-to: type=gha,mode=max)",
+        "Tag per branch develop: ghcr.io/piccioli/runts:develop",
+        "Tag per branch prod: ghcr.io/piccioli/runts:latest E ghcr.io/piccioli/runts:v$(cat VERSION) letto dal file VERSION",
+        "Typecheck passes"
       ],
       "priority": 6,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-007",
-      "title": "Bar chart verticale — proventi ETS 2024 per regione (Chart.js)",
-      "description": "As a user, I want to see the financial distribution by region so that I know which areas have the most complete financial data.",
+      "title": "GitHub Actions — deploy automatico su UAT Hetzner",
+      "description": "As a developer, I want the UAT server to automatically update when I merge to develop so that testers always have the latest code.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Proventi ETS 2024 per regione' con <canvas id='chart-proventi-regione'>",
-        "Chart.js vertical bar: asse X = regioni, asse Y = totale_proventi in €, colore rgba(25,135,84,0.7)",
-        "Tooltip mostra il valore formattato come '€ X.XXX.XXX'",
-        "Nota sotto il grafico: <p class='text-muted small'>Dati parziali — solo enti con bilancio 2024 analizzato</p>",
-        "Dati da variabile {{ proventi_2024_per_regione | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare .github/workflows/deploy-uat.yml che si attiva su workflow_run del workflow publish.yml completato con successo sul branch develop",
+        "Usa appleboy/ssh-action@v1 con host: ${{ secrets.UAT_SSH_HOST }}, username: ${{ secrets.UAT_SSH_USER }}, key: ${{ secrets.UAT_SSH_KEY }}",
+        "Comando remoto: cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f",
+        "In caso di fallimento SSH il workflow fallisce con exit code non zero",
+        "Typecheck passes"
       ],
       "priority": 7,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-008",
-      "title": "Line chart evoluzione proventi + select singolo ente (Chart.js)",
-      "description": "As a user, I want to select an entity and see its revenue trend over the years so that I can assess financial trajectory.",
+      "title": "GitHub Actions — deploy automatico su PROD Hetzner",
+      "description": "As a developer, I want the production server to automatically update when I merge to prod so that releases are zero-touch.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Evoluzione proventi nel tempo' con <select id='sel-ente'> popolato con gli enti di bilanci_per_ente (label = denominazione)",
-        "<canvas id='chart-proventi-tempo'> con line chart Chart.js: asse X = anni 2021-2025, asse Y = totale_proventi €, punto per ogni anno con dato",
-        "Cambiando la select, aggiorna chart.data.datasets[0].data e chart.update() senza ricaricare la pagina",
-        "All'avvio mostra il primo ente della lista (Bologna Mario Fantin)",
-        "Dati da var bilanciEnte = {{ bilanci_per_ente | tojson }};",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Creare .github/workflows/deploy-prod.yml che si attiva su workflow_run del workflow publish.yml completato con successo sul branch prod",
+        "Usa appleboy/ssh-action@v1 con host: ${{ secrets.PROD_SSH_HOST }}, username: ${{ secrets.PROD_SSH_USER }}, key: ${{ secrets.PROD_SSH_KEY }}",
+        "Comando remoto: cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f",
+        "Typecheck passes"
       ],
       "priority": 8,
-      "passes": true,
+      "passes": false,
       "notes": ""
     },
     {
       "id": "US-009",
-      "title": "Donut chart — distribuzione allegati per tipo (Chart.js)",
-      "description": "As a user, I want to see the breakdown of attachment types so that I know what document coverage we have.",
+      "title": "docker-compose separati per local, UAT e prod",
+      "description": "As a developer, I want separate Docker Compose files for each environment so that each has the right image and settings.",
       "acceptanceCriteria": [
-        "In stats.html, sezione 'Distribuzione allegati per tipo' con <canvas id='chart-allegati-tipo'>",
-        "Chart.js doughnut: segmenti per tipo con colori Bootstrap distinti (8 colori), legenda destra con tipo e conteggio",
-        "Dati da {{ allegati_per_tipo | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Rinominare docker-compose.yml in docker-compose.yml (resta il file base locale con build: .)",
+        "Creare docker-compose.uat.yml: image: ghcr.io/piccioli/runts:develop, ports: 8000:8000, volumes: /opt/runts/runts.db:/app/runts.db:ro e /opt/runts/attachments:/app/attachments:ro, environment: DB_PATH=/app/runts.db ENV=uat, restart: unless-stopped",
+        "Creare docker-compose.prod.yml: image: ghcr.io/piccioli/runts:latest, ports: 8000:8000, volumi identici a uat ma su /opt/runts/, environment: DB_PATH=/app/runts.db ENV=prod, restart: always",
+        "Copiare docker-compose.uat.yml sul server UAT: scp docker-compose.uat.yml root@135.181.25.33:/opt/runts/docker-compose.yml",
+        "Copiare docker-compose.prod.yml sul server PROD: scp docker-compose.prod.yml root@178.105.78.67:/opt/runts/docker-compose.yml",
+        "Aggiornare README con istruzioni: locale (docker compose up), UAT/prod (docker compose -f docker-compose.uat.yml up -d)",
+        "Typecheck passes"
       ],
       "priority": 9,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-010",
-      "title": "Tabella top 10 sezioni per sottosezioni con progress bar",
-      "description": "As a user, I want to see which sections have the most sub-sections so that I understand the network hierarchy.",
-      "acceptanceCriteria": [
-        "In stats.html, sezione 'Sezioni con più sottosezioni' con tabella: Pos, Denominazione (link /sezione/<codice_cai>?tab=sottosezioni), N. sottosezioni, barra progress proporzionale al max (Bergamo=30)",
-        "Dati da {{ top10_sottosezioni | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-011",
-      "title": "Tabella qualità dati con link ai filtri",
-      "description": "As a user, I want to see known data quality issues with direct links to filtered views so that I can act on them immediately.",
-      "acceptanceCriteria": [
-        "In stats.html, sezione 'Qualità dati' con tabella Bootstrap: colonne Problema, N. elementi, Azione",
-        "4 righe: 'Sezioni senza CF nel registro CAI' (n, link /?issues=1), 'Enti ETS non agganciati a sezione CAI' (n, link /ets), 'Sezioni CAI senza dati soci' (n, link /?issues=1), 'Gruppi Regionali non agganciati RUNTS' (n, link /gruppi-regionali)",
-        "Colonna N: badge bg-warning se n>0, bg-success se n=0",
-        "Colonna Azione: <a href='...'>Vedi →</a>",
-        "Dati da {{ qualita_dati | tojson }}",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 11,
-      "passes": true,
-      "notes": ""
-    },
-    {
-      "id": "US-012",
-      "title": "Mappa coropleta regioni italiane (D3 + GeoJSON)",
-      "description": "As a user, I want to see a color-coded map of Italy showing sections per region so that I can understand geographic distribution at a glance.",
-      "acceptanceCriteria": [
-        "In stats.html, sezione 'Sezioni CAI per regione' con <div id='map-regioni' style='height:420px'>",
-        "D3.js 7.x incluso via CDN nel {% block head %}: <script src='https://cdn.jsdelivr.net/npm/d3@7'>",
-        "D3 carica /static/it-regions.geojson via d3.json(), proietta con d3.geoMercator() centrata sull'Italia, colora ogni regione con d3.scaleSequential(d3.interpolateBlues) proporzionale a n_sezioni (0=bianco, 152=blu scuro)",
-        "Dizionario JS di normalizzazione nomi GeoJSON -> DB (es. {'Trentino-Alto Adige/Südtirol': 'TRENTINO-ALTO ADIGE', 'Valle d\\'Aosta/Vallée d\\'Aoste': 'VALLE D\\'AOSTA'})",
-        "Tooltip on hover: mostra REGIONE, n sezioni, soci totali",
-        "Regioni senza dati nel DB colorate in grigio chiaro #eee",
-        "Dati da var sociRegMap = {{ soci_per_regione | tojson }};",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
-      ],
-      "priority": 12,
-      "passes": true,
+      "passes": false,
       "notes": ""
     }
   ]
