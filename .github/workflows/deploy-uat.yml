@@ -1,0 +1,24 @@
+name: Deploy UAT
+
+on:
+  workflow_run:
+    workflows:
+      - Publish
+    branches:
+      - develop
+    types:
+      - completed
+
+jobs:
+  deploy-uat:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Deploy to UAT via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.UAT_SSH_HOST }}
+          username: ${{ secrets.UAT_SSH_USER }}
+          key: ${{ secrets.UAT_SSH_KEY }}
+          script: |
+            cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f
