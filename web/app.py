@@ -6,7 +6,7 @@ import sqlite3
 from typing import Optional
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -685,6 +685,34 @@ async def ente_pdf(id_runts: str):
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="ente_{id_runts}.pdf"'},
     )
+
+
+# ---------- Health endpoint ----------
+
+@app.get("/health")
+async def health():
+    if not _db_exists():
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "detail": "DB file not found"},
+        )
+    try:
+        conn = get_db()
+        try:
+            n = conn.execute("SELECT COUNT(*) FROM enti").fetchone()[0]
+        finally:
+            conn.close()
+    except Exception as exc:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "detail": str(exc)},
+        )
+    if n == 0:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "error", "detail": "enti table is empty"},
+        )
+    return JSONResponse(status_code=200, content={"status": "ok", "enti": n})
 
 
 # ---------- API endpoints ----------

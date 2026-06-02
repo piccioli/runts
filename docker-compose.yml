@@ -8,4 +8,9 @@ services:
       - ./attachments:/app/attachments:ro
     environment:
       - DB_PATH=/app/runts.db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
