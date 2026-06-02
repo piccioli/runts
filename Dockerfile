@@ -6,6 +6,7 @@ COPY web/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY web/ ./web/
+COPY VERSION ./VERSION
 
 EXPOSE 8000
 
