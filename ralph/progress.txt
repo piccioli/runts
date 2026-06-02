@@ -286,3 +286,15 @@ Started: Lun  1 Giu 2026
   - Jinja2 number formatting: `"{:,}".format(n).replace(",", ".")` for Italian thousands separator
   - Manual browser verification needed (no browser tools)
 ---
+
+## 2026-06-02 - US-004 (ralph/devops branch)
+- Creato `.devcontainer/devcontainer.json`: name=RUNTS-CAI, build.dockerfile=Dockerfile, postCreateCommand installa requirements + pre-commit + playwright chromium
+- Creato `.devcontainer/Dockerfile`: basato su python:3.12 (non slim), apt-get installa curl, git, e 20 dipendenze di sistema per Playwright Chromium
+- Creato `README.md` con sezioni Setup (locale, dev container, Docker) e Versioning; include nota 'Dev container disponibile — aprire in VS Code e selezionare Reopen in Container'
+- Files changed: `.devcontainer/Dockerfile` (new), `.devcontainer/devcontainer.json` (new), `README.md` (new)
+- **Learnings for future iterations:**
+  - Usare `python:3.12` (non slim) come base nel devcontainer Dockerfile — evita di dover installare manualmente troppe dipendenze di build
+  - Le dipendenze di sistema per Playwright Chromium includono libglib2.0-0, libnss3, libnspr4, libatk1.0-0, libxcb1, libgbm1, libasound2 (e altre ~15)
+  - Il `postCreateCommand` in devcontainer.json installa tutti i requirements Python + pre-commit hooks + playwright browser in un unico comando
+  - README.md creato da zero (non esisteva nel repo)
+---
