@@ -2,7 +2,7 @@ services:
   web:
     image: ghcr.io/piccioli/runts:develop
     ports:
-      - "8000:8000"
+      - "127.0.0.1:9000:8000"
     volumes:
       - /opt/runts/runts.db:/app/runts.db:ro
       - /opt/runts/attachments:/app/attachments:ro
