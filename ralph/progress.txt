@@ -228,6 +228,17 @@
   - `actions/checkout@v4` e `actions/setup-python@v5` sono le versioni correnti stabili
 ---
 
+## 2026-06-02 - US-008 (ralph/devops branch)
+- Creato `.github/workflows/deploy-prod.yml` che si attiva su `workflow_run` del workflow `Publish` completato con successo sul branch `prod`
+- Job `deploy-prod` con `if: ${{ github.event.workflow_run.conclusion == 'success' }}`
+- Usa `appleboy/ssh-action@v1` con host/username/key da secrets (`PROD_SSH_HOST`, `PROD_SSH_USER`, `PROD_SSH_KEY`)
+- Comando remoto: `cd /opt/runts && docker compose pull && docker compose up -d && docker image prune -f`
+- Files changed: `.github/workflows/deploy-prod.yml` (new)
+- **Learnings for future iterations:**
+  - Il file è identico a `deploy-uat.yml` tranne per: branch `prod` invece di `develop`, secrets `PROD_*` invece di `UAT_*`, job name `deploy-prod`
+  - Pattern consolidato: workflow_run + appleboy/ssh-action@v1 + docker compose pull/up/prune
+---
+
 ## Codebase Patterns
 - Pre-commit hook runs 6 pytest tests (`scraper/test_sede_legale.py`, `scraper/test_upsert.py`) — all commits must pass them
 - FastAPI app is in `web/app.py`; Jinja2 templates in `web/templates/`; static assets in `web/static/`
