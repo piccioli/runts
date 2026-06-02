@@ -153,6 +153,18 @@
   - Manual browser verification needed (no browser tools)
 ---
 
+## 2026-06-02 - US-003 (ralph/devops branch)
+- Creato `VERSION` nella root con contenuto `0.1.0`
+- Creato `CHANGELOG.md` con sezione iniziale `## [0.1.0] - 2026-06-02`
+- Creato `scripts/bump-version.sh` (chmod +x): accetta major|minor|patch, legge VERSION, incrementa, prepende in CHANGELOG.md, git commit + git tag
+- Testato con `bash scripts/bump-version.sh patch` → VERSION=0.1.1, tag v0.1.1; poi git reset --soft + restore a 0.1.0
+- Files changed: `VERSION` (new), `CHANGELOG.md` (new), `scripts/bump-version.sh` (new)
+- **Learnings for future iterations:**
+  - `git reset --soft HEAD~1` annulla il commit mantenendo i file modificati; poi `git restore --staged` per de-stagare
+  - Il script usa `printf "%s\n"` per scrivere il blocco CHANGELOG e poi `cat` per appendere il file esistente — funziona con `set -euo pipefail`
+  - `date +%Y-%m-%d` per la data corrente in formato ISO 8601
+---
+
 ## 2026-06-02 - US-002 (ralph/devops branch)
 - Creato `.pre-commit-config.yaml` con 4 hook: ruff check --fix, ruff format, mypy (--ignore-missing-imports, files ^(scraper|web)/), pytest locale via .venv/bin/python3
 - Creato `requirements-dev.txt` con pre-commit>=4.0.0
